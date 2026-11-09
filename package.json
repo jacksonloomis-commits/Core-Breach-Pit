@@ -1,10 +1,11 @@
 {
-  "name": "aetherclash",
-  "version": "0.1.0",
+  "name": "core-breach-pit",
+  "version": "1.0.0",
   "private": true,
-  "description": "AetherClash — original strategy card game, playable browser prototype",
+  "description": "CORE BREACH: PIT — retro pixel boss-rush arena (Core-Breach-Zero spinoff). Static browser game, no build step, no backend. The AetherClash card game lives on in /aetherclash/.",
   "scripts": {
-    "test": "node scripts/run-tests.js",
-    "start": "node scripts/serve.js"
-  }
+    "start": "node scripts/serve.js",
+    "test": "node scripts/run-tests.js"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

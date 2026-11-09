@@ -1,13 +1,18 @@
-// npm test — runs the rules engine suite + AI smoke games.
-const { spawnSync } = require('node:child_process');
-const path = require('node:path');
-const failed = [];
-const run = (args) => {
-  console.log(`\n=== node ${args.join(' ')}`);
-  const r = spawnSync(process.execPath, args, { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
-  if (r.status !== 0) failed.push(args.join(' '));
-};
-run(['scripts/engine-test.js']);
-run(['scripts/smoke-ai.js']);
-console.log(failed.length ? `\nFAILED: ${failed.join(', ')}` : '\nALL TEST FILES PASSED');
-process.exit(failed.length ? 1 : 0);
+// CORE BREACH: PIT — test runner. Runs the PIT sim suite.
+const { spawnSync } = require('child_process');
+const path = require('path');
+const root = __dirname + '/..';
+
+const suites = [
+  { name: 'PIT sim suite', cmd: 'node', args: [path.join(root, 'tests', 'sim-test.js')] }
+];
+
+let failed = 0;
+for (const s of suites) {
+  console.log(`\n===== ${s.name} =====`);
+  const r = spawnSync(s.cmd, s.args, { stdio: 'inherit', cwd: root });
+  if (r.status !== 0) { failed++; console.log(`SUITE FAILED: ${s.name}`); }
+}
+
+console.log(failed ? `\n${failed} SUITE(S) FAILED` : '\nALL TEST SUITES PASSED');
+process.exit(failed ? 1 : 0);

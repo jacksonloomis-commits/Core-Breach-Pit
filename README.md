@@ -1,36 +1,48 @@
-# AetherClash
+# CORE BREACH: PIT
 
-An original **strategic collectible card game** — playable browser prototype (beta preview).
+A retro-pixel **boss-rush arena** — spinoff of [Core-Breach: Zero](https://gamble-limited-ltd.github.io/Core-Breach-Zero/). You are a Core-Breach operative dropped into the Pit; the Crimson Tide sends its lieutenants one arena at a time. Read the telegraph, dash through the beam, send them back.
 
-Command the rift: summon monsters, cast spells, spring traps, and build **response chains** against the Archivist, a heuristic AI opponent that plays by exactly the same rules you do — and never peeks at your hand.
+**Play: https://jacksonloomis-commits.github.io/Core-Breach-Pit/**
 
-## Play
+Static browser game: HTML/CSS/JS, no build step, no backend, no accounts, no network. (This repo previously hosted the **AetherClash** card game under the name `AetherClash`; the card game was retired from the tree when the Pit became the main game — recoverable from git history at commit `e0653bb`.)
 
-Open the site (GitHub Pages) and press **DUEL**. Everything unlocks through play: wins earn XP (levels grant packs), wins also grant packs + shards, and duplicates convert into shards for crafting. No purchases, no accounts, no server — progress saves to your browser.
+## The beta ladder
 
-## The game
+| Arena | Tier | Boss | Unlocks |
+| --- | --- | --- | --- |
+| I | BRONZE | GATEKEEPER — aimed slugs, ring bursts | — |
+| II | BRONZE | BILESPITTER — floor pools, shotgun volleys | **GHOST** |
+| III | SILVER | THE SURGEON — laser sweeps, body charges | — |
+| IV | GOLD | HIVE MOTHER — spirals, live spawn | **BULWARK** |
+| V | CHAMPION | DEATHWARRANT — everything, angry | PIT CHAMPION |
 
-- 8,000 Life Points · 40-card decks · 5 monster + 5 spell/trap zones per player
-- One Normal Summon per turn; Tribute Summons for level 5+ monsters; Special Summons via card effects
-- Draw → Main 1 → Battle → Main 2 → End phases; ATK/DEF positions, set monsters, flip effects
-- **Real chain system**: spell speeds (1/2/3), alternating response windows, LIFO resolution, negation, counter traps, fizzling when targets vanish, once-per-turn / once-per-duel limits
-- **53 original cards** — every effect is implemented game logic (structured effect definitions interpreted by the engine), not flavor text: auras, triggers, quick effects, counters, graveyard and banish effects, taunt redirection, ATK copying, tribute economy, attack locks
-- Deck builder (3 save slots, legality validation), collection with search/filters, pack opening with published odds, crafting
-- Practice mode with a card-tester debug bar (free card access, LP control, hand reveal)
+**Operatives:** VOLT (starter, overcharge), GHOST (fast, phase — walk through anything), BULWARK (tanky, frontal barrier).
 
-## Engineering
+**Stars per arena:** 3 = flawless · 2 = two hits or fewer · 1 = cleared. Pure progression: no rating, no server — clear an arena to open the next.
 
-```
-npm install   # zero dependencies — tests run on plain Node
+**Controls:** WASD/arrows move · SPACE/SHIFT dash (i-frames) · E ability · P pause. Your gun auto-fires at the nearest hostile; the game is positioning, dash timing, and pattern reading.
+
+**Fairness law:** every attack is telegraphed for at least 0.5 s (gold flash, dashed charge lines, outlined pools), projectile and charge speeds are capped, floor pools can never appear on top of you, and phase transitions wipe live bullets for a breather. All of this is asserted by tests.
+
+## Run and test
+
+```bash
 npm start     # local play at http://localhost:8080
-npm test      # rules-engine suite + AI smoke games (must pass before every push)
+npm test      # PIT sim suite (must pass before every push)
 ```
 
-- `cards.js` — card data only · `engine.js` — pure rules engine (no DOM) · `ai.js` — AI (no hidden information) · `app.js` — UI
-- The test suite verifies battle math, chain order, negation, targeting legality, once-per-turn locks, win conditions, state immutability on rejection, a no-cheat check on the AI's information barrier, and full AI-vs-AI matches.
+The sim suite runs the engine headlessly in Node and includes a **dodge-bot** that must beat every boss on 3/3 fixed seeds (plus a flawless clear on Arena I), fairness probes from live sims, progression unit tests, and a random-input fuzz. If the bot cannot clear your new arena, the arena does not ship.
 
-See `AGENTS.md` for the development rules.
+## Architecture
+
+- `engine.js` — pure rules/sim engine (no DOM): player, dash i-frames, hitscan, projectiles, beams, zones, minions, boss pattern interpreter. Runs in the browser and in Node.
+- `chars.js`, `bosses.js` — pure data: operatives; arenas + boss phases built from pattern primitives (aimed / ring / shotgun / sweep / charge / zone / spiral / spawn).
+- `palette.js` — 16-color retro palette. `audio.js` — WebAudio bleep synth, no assets.
+- `app.js` — fixed-timestep loop, pixel renderer, hub, results, localStorage save (`cbp-save-v1`).
+- `tests/sim-test.js` — everything above. `scripts/run-tests.js` — the runner.
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.01 // AETHERCLASH BETA** (bust `20261101b`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.10 // PIT OPEN BETA** (bust `20261110b`).
+
+See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).
