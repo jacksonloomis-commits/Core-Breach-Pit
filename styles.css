@@ -7,6 +7,10 @@
   --white: #f4f6ff; --gray: #6b7690;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Author display rules (e.g. .result-ov { display:flex }) are stronger than the UA
+   stylesheet's [hidden] rule — without this, overlays ignore the hidden attribute and
+   the PAUSED/RESULTS screens stick over the fight. Do not remove. */
+[hidden] { display: none !important; }
 html, body { background: var(--bg); color: var(--white); }
 body {
   font-family: "Courier New", Courier, monospace;

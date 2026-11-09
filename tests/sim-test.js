@@ -271,11 +271,15 @@ console.log('--- House guards ---');
   const fs = require('fs');
   const APP = fs.readFileSync(__dirname + '/../app.js', 'utf8');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
+  const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   check('app.js pins BUILD 2026.11.10', APP.includes("const BUILD = '2026.11.10'"));
   check('app.js update log leads with PIT OPEN BETA', APP.includes("tag: 'PIT OPEN BETA'"));
+  check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('index.html footer stamps BUILD 2026.11.10 // CORE BREACH: PIT', IDX.includes('BUILD 2026.11.10 // CORE BREACH: PIT'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110b', busts.length === 7 && busts.every(t => t === '?v=20261110b'), busts.join(','));
+  check('all 7 asset tags bust at 20261110c', busts.length === 7 && busts.every(t => t === '?v=20261110c'), busts.join(','));
+  check('styles.css forces [hidden] display:none !important (overlays respect hidden)', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(CSS));
+  check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));
 }
 
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`);

@@ -7,7 +7,8 @@
       'Compact beta: 5 arenas (Bronze to Champion), 5 Crimson Tide bosses with telegraphed attack patterns',
       '3 playable operatives: VOLT (starter), GHOST (clear Arena II), BULWARK (clear Arena IV)',
       'Real-time dodge combat: WASD move, Space dash with i-frames, E ability, auto-fire hitscan',
-      'Star ratings per arena (3 = flawless), pure progression unlocks, CRT filter + synth SFX'
+      'Star ratings per arena (3 = flawless), pure progression unlocks, CRT filter + synth SFX',
+      'HOTFIX: PAUSED/RESULTS overlays no longer stick over the fight (CSS was ignoring the hidden attribute), and P/Esc now unpauses too'
     ] }
   ];
 
@@ -149,10 +150,11 @@
   document.addEventListener('keydown', (e) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
     keys[e.key.toLowerCase()] = true;
+    // pause toggle must be reachable while paused too — never gate it behind the early return
+    if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }
     if (!running || paused || !st || st.over) return;
     if (e.key === ' ' || e.key === 'Shift') queueDash = true;
     if (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'q') queueAb = true;
-    if (e.key === 'p' || e.key === 'Escape') togglePause();
   });
   document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
   let queueDash = false, queueAb = false;
