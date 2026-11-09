@@ -3,6 +3,12 @@
   'use strict';
   const BUILD = '2026.11.10';
   const UPDATE_LOG = [
+    { version: '2026.11.10', tag: 'BALANCE + UI PASS', items: [
+      'FIXED: dash invincibility never expired — one dash made you untouchable for the whole run. You can be hit now. Sorry.',
+      'Boss pass: HP up across the ladder (160/230/280/440/520), fire rate down, pattern gaps halved, projectile speeds pushed toward the cap, denser volleys, tougher minions',
+      'Champion wall: DEATHWARRANT enrage phase rebuilt — beatable, but it will cost you hits',
+      'HUD rebuilt: two clean rows (hearts · boss bar + timer · dash + ability bars · phase + hits), brighter text everywhere, softer scanlines, bigger hub fonts'
+    ] },
     { version: '2026.11.10', tag: 'PIT OPEN BETA', items: [
       'Compact beta: 5 arenas (Bronze to Champion), 5 Crimson Tide bosses with telegraphed attack patterns',
       '3 playable operatives: VOLT (starter), GHOST (clear Arena II), BULWARK (clear Arena IV)',
@@ -365,40 +371,45 @@
     const p = st.player, b = st.boss;
     px(0, 0, PIT.W, PIT.HUD, C.deep);
     px(0, PIT.HUD - 1, PIT.W, 1, C.wall);
-    // hearts
+    cx.font = '7px monospace';
+    cx.textBaseline = 'top';
+    // row 1: hearts | boss name over its bar | run timer
     for (let i = 0; i < p.maxHearts; i++) {
       const on = i < p.hearts;
-      px(8 + i * 10, 6, 7, 7, on ? C.crimson : '#20283e');
-      px(9 + i * 10, 5, 5, 2, on ? C.crimson : '#20283e');
-      px(10 + i * 10, 8, 1, 1, on ? C.crimlite : '#20283e');
+      px(6 + i * 10, 3, 7, 7, on ? C.crimson : '#20283e');
+      px(7 + i * 10, 2, 5, 2, on ? C.crimson : '#20283e');
+      px(8 + i * 10, 5, 1, 1, on ? C.crimlite : '#20283e');
     }
-    // dash pips + ability bar
-    const dashReady = p.dashCd <= 0;
-    px(70, 6, 30, 3, '#20283e');
-    px(70, 6, Math.round(30 * (1 - p.dashCd / st.char.dashCd)), 3, dashReady ? C.tealite : C.teal);
-    cx.font = '7px monospace'; cx.textBaseline = 'top';
-    cx.fillStyle = C.gray; cx.fillText('DASH', 70, 11);
-    const abReady = p.abCd <= 0;
-    px(106, 6, 40, 3, '#20283e');
-    px(106, 6, Math.round(40 * (1 - p.abCd / st.char.abCd)), 3, abReady ? C.gold : C.amber);
-    cx.fillStyle = abReady ? C.gold : C.gray;
-    cx.fillText(st.char.abName, 106, 11);
-    // boss bar
-    const bw = 120, bx = (PIT.W - bw) / 2;
-    px(bx, 5, bw, 6, '#20283e');
-    px(bx, 5, Math.round(bw * Math.max(0, b.hp / b.maxHp)), 6, C.crimson);
+    cx.textAlign = 'center';
+    cx.fillStyle = C.white;
+    cx.fillText(st.bossDef.name, PIT.W / 2, 2);
+    const bw = 110, bx = Math.round((PIT.W - bw) / 2);
+    px(bx, 10, bw, 6, '#20283e');
+    px(bx, 10, Math.round(bw * Math.max(0, b.hp / b.maxHp)), 6, C.crimson);
     for (let i = 1; i < st.bossDef.phases.length; i++) {
       const fx = bx + Math.round(bw * st.bossDef.phases[i].until);
-      px(fx, 4, 1, 8, C.gold);
+      px(fx, 9, 1, 8, C.gold);
     }
-    cx.fillStyle = C.white; cx.textAlign = 'center';
-    cx.fillText(`${st.bossDef.name}`, PIT.W / 2, 12);
+    const mn = Math.floor(st.t / 60), sc = Math.floor(st.t % 60);
+    cx.textAlign = 'right';
+    cx.fillStyle = C.gray;
+    cx.fillText(mn + ':' + String(sc).padStart(2, '0'), PIT.W - 6, 2);
+    // row 2: dash + ability bars left, phase/hits right
+    const dashReady = p.dashCd <= 0;
     cx.textAlign = 'left';
-    // right side info
-    cx.fillStyle = C.gray; cx.textAlign = 'right';
-    cx.fillText(`${st.arena.name} · ${Math.floor(st.t)}s · HITS ${st.hitsTaken}`, PIT.W - 8, 6);
+    cx.fillStyle = C.gray;
+    cx.fillText('DASH', 6, 17);
+    px(28, 18, 22, 3, '#20283e');
+    px(28, 18, Math.round(22 * (1 - p.dashCd / st.char.dashCd)), 3, dashReady ? C.tealite : C.teal);
+    const abReady = p.abCd <= 0;
+    cx.fillStyle = abReady ? C.gold : C.gray;
+    cx.fillText(st.char.abName, 56, 17);
+    const abx = 56 + st.char.abName.length * 4.6 + 4; // clear the longest label (OVERCHARGE)
+    px(abx, 18, 26, 3, '#20283e');
+    px(abx, 18, Math.round(26 * (1 - p.abCd / st.char.abCd)), 3, abReady ? C.gold : C.amber);
+    cx.textAlign = 'right';
     cx.fillStyle = st.bossDef.phases[st.boss.phase].enrage ? C.crimlite : C.gray;
-    cx.fillText(`PHASE ${st.boss.phase + 1}/${st.bossDef.phases.length}`, PIT.W - 8, 13);
+    cx.fillText(`PHASE ${st.boss.phase + 1}/${st.bossDef.phases.length} · HITS ${st.hitsTaken}`, PIT.W - 6, 17);
     cx.textAlign = 'left';
   }
 

@@ -20,7 +20,7 @@ Static browser game: HTML/CSS/JS, no build step, no backend, no accounts, no net
 
 **Stars per arena:** 3 = flawless · 2 = two hits or fewer · 1 = cleared. Pure progression: no rating, no server — clear an arena to open the next.
 
-**Controls:** WASD/arrows move · SPACE/SHIFT dash (i-frames) · E ability · P pause. Your gun auto-fires at the nearest hostile; the game is positioning, dash timing, and pattern reading.
+**Controls:** WASD/arrows move · SPACE/SHIFT dash (i-frames) · E ability · P/ESC pause. Your gun auto-fires at the nearest hostile; the game is positioning, dash timing, and pattern reading.
 
 **Fairness law:** every attack is telegraphed for at least 0.5 s (gold flash, dashed charge lines, outlined pools), projectile and charge speeds are capped, floor pools can never appear on top of you, and phase transitions wipe live bullets for a breather. All of this is asserted by tests.
 
@@ -43,6 +43,6 @@ The sim suite runs the engine headlessly in Node and includes a **dodge-bot** th
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.10 // PIT OPEN BETA** (bust `20261110c`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.10 // BALANCE + UI PASS** (bust `20261110d`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

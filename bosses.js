@@ -1,7 +1,11 @@
 // CORE BREACH: PIT — arena + boss definitions. Pure data, no DOM.
-// Every pattern type: tele (telegraph seconds, MIN 0.5), then active, then 0.4 recover.
+// Every pattern type: tele (telegraph seconds, MIN 0.5), then active, then recover (default 0.25).
 // FAIRNESS RULES asserted by tests: tele >= 0.5, projectile speed <= 90,
-// floor pools are outlined during telegraph and can never spawn on the player.
+// charge speed <= 190, floor pools are outlined during telegraph and can never
+// spawn on the player. Do not weaken the law to make a pattern pass.
+// BALANCE PASS 2026.11.10: fights were ending before the patterns could threaten
+// anyone (bot cleared Arena I in 8s, zero hits). Boss HP up, player fire rate down,
+// gaps roughly halved, projectile speeds pushed toward the cap, denser volleys.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.PIT_BOSSES = factory();
@@ -19,56 +23,56 @@
 
   const LIST = [
     {
-      id: 'gatekeeper', name: 'GATEKEEPER', hp: 100, r: 10,
+      id: 'gatekeeper', name: 'GATEKEEPER', hp: 160, r: 10,
       title: 'WARDEN OF THE FIRST GATE',
       brief: 'Basic tide construct. Slow aimed slugs and ring bursts. Learn the dash.',
       tint: '#e23b4e',
       phases: [
-        { until: 1, gap: 1.5, patterns: [aimed(3, 16, 80, 0.7), ring(14, 52, 0.8)] },
-        { until: 0.5, gap: 1.1, patterns: [ring(18, 56, 0.8), aimed(5, 24, 84, 0.6), shotgun(2, 4, 26, 76, 0.6, 0.5)] }
+        { until: 1, gap: 1.35, patterns: [aimed(3, 16, 80, 0.7), ring(12, 54, 0.8)] },
+        { until: 0.5, gap: 1.15, patterns: [ring(14, 56, 0.75), aimed(3, 22, 82, 0.65), shotgun(2, 4, 24, 78, 0.65, 0.5)] }
       ]
     },
     {
-      id: 'bilespitter', name: 'BILESPITTER', hp: 150, r: 11,
+      id: 'bilespitter', name: 'BILESPITTER', hp: 230, r: 11,
       title: 'CHEM-WARDEN OF THE LOW PITS',
       brief: 'Floods the floor with bile pools, then peppers the dry ground. Watch your feet.',
       tint: '#9ae66e',
       phases: [
-        { until: 1, gap: 1.6, patterns: [shotgun(2, 5, 32, 74, 0.6, 0.5), zone(3, 22, 4, 0.8)] },
-        { until: 0.55, gap: 1.2, patterns: [zone(4, 22, 4, 0.7), shotgun(3, 5, 32, 78, 0.6, 0.45), aimed(3, 16, 82, 0.6)] }
+        { until: 1, gap: 1.3, patterns: [shotgun(2, 5, 30, 78, 0.65, 0.5), zone(3, 24, 4.5, 0.8)] },
+        { until: 0.55, gap: 1.0, patterns: [zone(4, 24, 5, 0.75), shotgun(3, 5, 32, 80, 0.65, 0.45), aimed(3, 16, 82, 0.65)] }
       ]
     },
     {
-      id: 'surgeon', name: 'THE SURGEON', hp: 200, r: 10,
+      id: 'surgeon', name: 'THE SURGEON', hp: 280, r: 10,
       title: 'CUTTER OF THE CRIMSON COURT',
       brief: 'Rotating cutting beams and body charges. Dash THROUGH the beam, never away from it.',
       tint: '#ff7a8a',
       phases: [
-        { until: 1, gap: 1.7, patterns: [sweep(60, 2.2, 3, 0.6), charge(165, 0.55, 0.6)] },
-        { until: 0.66, gap: 1.3, patterns: [sweep(75, 2.2, 3, 0.6), charge(175, 0.55, 0.6), aimed(3, 16, 84, 0.6)] },
-        { until: 0.33, gap: 1.1, patterns: [sweep(70, 2.4, 3, 0.6, 2), charge(185, 0.55, 0.55)] }
+        { until: 1, gap: 1.3, patterns: [sweep(56, 2.2, 3, 0.65), charge(160, 0.6, 0.75)] },
+        { until: 0.66, gap: 1.2, patterns: [sweep(58, 2.2, 3, 0.65), charge(160, 0.6, 0.75), aimed(2, 16, 82, 0.7)] },
+        { until: 0.33, gap: 1.05, patterns: [sweep(60, 2.4, 3, 0.6), charge(170, 0.6, 0.7)] }
       ]
     },
     {
-      id: 'hive', name: 'HIVE MOTHER', hp: 260, r: 12,
+      id: 'hive', name: 'HIVE MOTHER', hp: 440, r: 12,
       title: 'BROODWARD OF THE TIDE',
       brief: 'Spiral brood-fire and live spawn. Kill the blobs or they will herd you.',
       tint: '#c98f4d',
       phases: [
-        { until: 1, gap: 1.7, patterns: [spiral(4, 0.17, 7, 45, 0.6), spawn(2, 4, 0.6)] },
-        { until: 0.66, gap: 1.3, patterns: [spiral(5, 0.15, 7, 47, 0.6), spawn(2, 4, 0.6), ring(12, 54, 0.8)] },
-        { until: 0.33, gap: 1.1, patterns: [ring(16, 56, 0.8), spawn(2, 4, 0.6), spiral(4, 0.13, 8, 49, 0.6)] }
+        { until: 1, gap: 1.1, patterns: [spiral(4, 0.14, 8, 58, 0.6), spawn(2, 5, 0.6)] },
+        { until: 0.66, gap: 0.9, patterns: [spiral(5, 0.13, 8, 58, 0.6), spawn(3, 6, 0.6), ring(14, 60, 0.8)] },
+        { until: 0.33, gap: 0.75, patterns: [ring(16, 60, 0.75), spawn(3, 6, 0.6), spiral(4, 0.12, 9, 60, 0.6)] }
       ]
     },
     {
-      id: 'deathwarrant', name: 'DEATHWARRANT', hp: 380, r: 12,
+      id: 'deathwarrant', name: 'DEATHWARRANT', hp: 520, r: 12,
       title: 'THE PIT CHAMPION',
       brief: 'Every trick in the Tide, one body. Three phases. The last one is angry.',
       tint: '#8f1f2e',
       phases: [
-        { until: 1, gap: 1.4, patterns: [aimed(5, 26, 84, 0.6), ring(14, 56, 0.7), charge(170, 0.55, 0.6)] },
-        { until: 0.66, gap: 1.2, patterns: [sweep(72, 2.2, 3, 0.6), zone(3, 22, 4, 0.7), spiral(4, 0.15, 6, 47, 0.6)] },
-        { until: 0.33, gap: 1.0, patterns: [ring(18, 58, 0.7), sweep(75, 2.4, 3, 0.6, 2), charge(185, 0.55, 0.55), spawn(2, 3, 0.6), shotgun(2, 5, 32, 80, 0.6, 0.45)], enrage: true }
+        { until: 1, gap: 1.3, patterns: [aimed(5, 26, 86, 0.65), ring(13, 60, 0.7), charge(168, 0.6, 0.75)] },
+        { until: 0.66, gap: 1.05, patterns: [sweep(62, 2.2, 3, 0.65), zone(4, 24, 4.5, 0.7), spiral(4, 0.14, 7, 54, 0.6)] },
+        { until: 0.33, gap: 1.0, patterns: [ring(14, 60, 0.7), sweep(60, 2.4, 3, 0.6, 2), charge(176, 0.6, 0.7), spawn(2, 4, 0.6), shotgun(2, 4, 30, 78, 0.7, 0.5)], enrage: true }
       ]
     }
   ];

@@ -30,7 +30,10 @@ function immediateDanger(st) {
   for (const beam of st.beams) {
     const ex = beam.x + Math.cos(beam.ang) * 400, ey = beam.y + Math.sin(beam.ang) * 400;
     const dd = pointLineDist(p.x, p.y, beam.x, beam.y, ex, ey);
-    if (dd < 9) danger += (9 - dd) * 4;
+    // beam tips outrun the player (56deg/s at 150px = 147px/s vs speed 68) — the only counter is
+    // dashing THROUGH the beam (the tutorial's own advice). Weight beams hard so the dash fires
+    // while the beam is still a few px out, not on contact.
+    if (dd < 9) danger += (9 - dd) * 10;
   }
   const rt = st.boss.rt;
   if (rt.mode === 'tele' && rt.pat && rt.pat.type === 'charge') {
@@ -137,7 +140,7 @@ console.log('--- Rules ---');
 {
   const st = PIT.createRun({ arenaIndex: 0, charId: 'volt', seed: 42 });
   check('volt starts with 3 hearts', st.player.hearts === 3 && st.player.maxHearts === 3);
-  check('boss starts at full HP', st.boss.hp === 100);
+  check('boss starts at full HP', st.boss.hp === st.bossDef.hp && st.boss.maxHp === st.bossDef.hp && st.boss.hp >= 160);
   // dash i-frames: projectile overlap during dash does not hurt
   st.player.dashI = 0.2;
   st.proj.push({ x: st.player.x, y: st.player.y, vx: 0, vy: 0, r: 3 });
@@ -155,6 +158,17 @@ console.log('--- Rules ---');
   PIT.step(st, 1 / 60, { mx: 0, my: 0 });
   check('hit lands when vulnerable', st.player.hearts === 2 && st.player.invuln > 0.9);
   check('hits tracked for stars', st.hitsTaken === 1);
+  // REGRESSION: dash i-frames must expire (dashI once never decayed -> permanent invincibility)
+  {
+    const st2 = PIT.createRun({ arenaIndex: 0, charId: 'volt', seed: 9 });
+    st2.player.dashI = 0.25;
+    for (let i = 0; i < 30; i++) PIT.step(st2, 1 / 60, { mx: 0, my: 0 });
+    check('dash i-frames expire after the dash', st2.player.dashI === 0);
+    st2.player.invuln = 0;
+    st2.proj.push({ x: st2.player.x, y: st2.player.y, vx: 0, vy: 0, r: 3 });
+    PIT.step(st2, 1 / 60, { mx: 0, my: 0 });
+    check('player is hittable once i-frames end', st2.player.hearts === 2);
+  }
 }
 
 // ================= star + progression logic =================
@@ -273,11 +287,13 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   check('app.js pins BUILD 2026.11.10', APP.includes("const BUILD = '2026.11.10'"));
-  check('app.js update log leads with PIT OPEN BETA', APP.includes("tag: 'PIT OPEN BETA'"));
+  check('app.js update log leads with BALANCE + UI PASS', APP.includes("tag: 'BALANCE + UI PASS'"));
+  check('app.js logs the PIT OPEN BETA entry', APP.includes("tag: 'PIT OPEN BETA'"));
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
+  check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('index.html footer stamps BUILD 2026.11.10 // CORE BREACH: PIT', IDX.includes('BUILD 2026.11.10 // CORE BREACH: PIT'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110c', busts.length === 7 && busts.every(t => t === '?v=20261110c'), busts.join(','));
+  check('all 7 asset tags bust at 20261110d', busts.length === 7 && busts.every(t => t === '?v=20261110d'), busts.join(','));
   check('styles.css forces [hidden] display:none !important (overlays respect hidden)', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(CSS));
   check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));
 }

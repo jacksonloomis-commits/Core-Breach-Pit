@@ -12,7 +12,7 @@
     : (typeof require === 'function' ? require('./bosses.js') : null);
 
   // ---------- geometry ----------
-  const W = 320, H = 180, HUD = 20;
+  const W = 320, H = 180, HUD = 26;
   const AR = { x0: 8, y0: HUD + 8, x1: W - 8, y1: H - 8 }; // playfield bounds
 
   const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
@@ -136,7 +136,7 @@
   function spawnProj(st, x, y, ang, speed, kind) {
     const def = st.bossDef;
     const phase = def.phases[st.boss.phase];
-    const mult = phase.enrage ? 1.15 : 1;
+    const mult = phase.enrage ? 1.2 : 1;
     st.proj.push({ x, y, vx: Math.cos(ang) * speed * mult, vy: Math.sin(ang) * speed * mult, r: 3, kind: kind || 'shot' });
   }
 
@@ -211,7 +211,7 @@
           st.minions.push({
             x: clamp(b.x + Math.cos(a) * 26, AR.x0 + 4, AR.x1 - 4),
             y: clamp(b.y + Math.sin(a) * 26, AR.y0 + 4, AR.y1 - 4),
-            r: 3, hp: 10, hitFlash: 0
+            r: 3, hp: 14, hitFlash: 0
           });
         }
         st.events.push({ type: 'spawn' });
@@ -245,6 +245,7 @@
     if (mlen > 0) { mx /= mlen; my /= mlen; p.mvx = mx; p.mvy = my; }
 
     p.dashCd = Math.max(0, p.dashCd - dt);
+    p.dashI = Math.max(0, p.dashI - dt); // REGRESSION FIX: dashI was never decayed -> one dash made you invincible for the whole run
     p.invuln = Math.max(0, p.invuln - dt);
     p.hitCd = Math.max(0, p.hitCd - dt);
     p.rage = Math.max(0, p.rage - dt);
@@ -254,7 +255,7 @@
 
     if (input && input.dash && p.dashCd <= 0) {
       const dx = mlen > 0 ? mx : p.mvx, dy = mlen > 0 ? my : p.mvy;
-      p.dashT = 0.18; p.dashI = 0.25; p.dashCd = ch.dashCd;
+      p.dashT = 0.18; p.dashI = (typeof ch.dashI === 'number' ? ch.dashI : 0.25); p.dashCd = ch.dashCd;
       p.dvx = dx * ch.speed * 2.4; p.dvy = dy * ch.speed * 2.4;
       st.events.push({ type: 'dash', x: p.x, y: p.y });
     }
@@ -274,7 +275,7 @@
     // --- auto-fire hitscan at nearest enemy
     p.fireT -= dt;
     if (p.fireT <= 0) {
-      p.fireT = 0.20 / (p.rage > 0 ? 2 : 1);
+      p.fireT = 0.26 / (p.rage > 0 ? 2 : 1);
       let target = null, best = Infinity;
       for (const m of st.minions) {
         const d = dist(p.x, p.y, m.x, m.y);
@@ -333,12 +334,12 @@
       if (pat.type === 'charge') execPattern(st, dt); // charge moves boss during active
       if (rt.timer <= 0) {
         rt.mode = 'recover';
-        rt.timer = 0.4;
+        rt.timer = (typeof ph.recover === 'number') ? ph.recover : 0.25;
         st.beams.length = 0;
       }
     } else if (rt.mode === 'recover' && rt.timer <= 0) {
       rt.mode = 'gap';
-      rt.timer = ph.gap * (ph.enrage ? 0.9 : 1);
+      rt.timer = ph.gap * (ph.enrage ? 0.78 : 1);
     }
 
     // --- projectiles
@@ -383,8 +384,8 @@
     for (const m of st.minions) {
       m.hitFlash = Math.max(0, m.hitFlash - dt);
       const d = dist(m.x, m.y, p.x, p.y) || 1;
-      m.x += ((p.x - m.x) / d) * 30 * dt;
-      m.y += ((p.y - m.y) / d) * 30 * dt;
+      m.x += ((p.x - m.x) / d) * 38 * dt;
+      m.y += ((p.y - m.y) / d) * 38 * dt;
       if (d < m.r + p.r + 1) hurt(st, 'minion');
     }
     // --- boss body contact (grace via hitCd)

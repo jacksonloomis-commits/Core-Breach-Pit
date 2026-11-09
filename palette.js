@@ -10,7 +10,7 @@
     crimson: '#e23b4e', crimdark: '#8f1f2e', crimlite: '#ff7a8a',
     teal: '#35d0c0', tealdark: '#1a7a72', tealite: '#a8fff5',
     amber: '#ffb84d', gold: '#ffd98a', white: '#f4f6ff',
-    gray: '#6b7690', purple: '#7a4dd8', void: '#131a2e'
+    gray: '#97a3bf', purple: '#7a4dd8', void: '#131a2e'
   };
 
   return { C };
