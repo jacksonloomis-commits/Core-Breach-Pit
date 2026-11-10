@@ -1,8 +1,23 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.10';
+  const BUILD = '2026.11.11';
   const UPDATE_LOG = [
+    { version: '2026.11.11', tag: 'BOSS EXPANSION', items: [
+      'THE ROSTER GOES 5 -> 15: ten new Crimson Tide lieutenants across three difficulty bands — GNASHER, CINDERMITE, THRESHER (bronze), PALE HERALD, GLOAMWARDEN, CARRION LAW (silver), IRON CHOIR, THE FATHOM, GRAVEWAKE, NULL SOVEREIGN (beyond)',
+      'Silver recalibrated (owner spec): silver-rank rolls are now ALL champion-weight — THE SURGEON (280 -> 500) and HIVE MOTHER (440 -> 480) were rebuilt into the DEATHWARRANT area, and every silver pool member is pinned to 480-560 base HP by tests',
+      'Bronze stays easy on purpose: GATEKEEPER, BILESPITTER and three new lightweights keep the warm-up "super ez" — two phases, big gaps, slow slugs',
+      'Beyond the champion: IRON CHOIR, THE FATHOM, GRAVEWAKE and NULL SOVEREIGN (600-720 HP, up to 4 phases) rotate in from Platinum upward — the real wall past the ladder\'s mid ranks',
+      'Every new boss is proven beatable by the dodge-bot (3/3 seeds) at base, and the whole bronze + silver ladder is bot-proven at its rank preset; Platinum+ presets are the documented beyond-bot zone'
+    ] },
+    { version: '2026.11.10', tag: 'RANKED BETA', items: [
+      'STARS AND ARENAS ARE GONE. Ranked SR ladder instead: Bronze 1-3, Silver 1-3, Gold 1-2, Platinum 1-3, Diamond 1-3, Crimson 1-3, Iridescent — climb by banking SR, never resets',
+      'SR economy: win at full HP +30 · one heart lost +15 · two lost -5 · three or more lost -20 · flatline -10',
+      'Random boss rotation inside your rank; higher ranks fight the same bosses with more HP and tighter pacing (telegraphs and speeds stay fairness-legal) — Silver walls you with the DEATHWARRANT weight class',
+      'TOP 5 board: hit Iridescent (3500 SR, qualifying 4000) and crack the board by SR; every rank drops cosmetics when the season ends — Season 1 is live',
+      'Operatives now unlock by SR: GHOST at Silver (500), BULWARK at Platinum (1100). Old saves migrate: cleared arenas + stars convert to starting SR',
+      'Also in this ship: GHOST PHASE actually grants intangibility now (it was cosmetic), plus regression tests for all three abilities'
+    ] },
     { version: '2026.11.10', tag: 'ABILITY HOTFIX', items: [
       'FIXED: GHOST PHASE was a coat of paint — the 2s intangibility timer existed but the damage code never read it, so shots, pools, beams, minions and the boss itself all still hit while phased. PHASE now truly walks through everything.',
       'Full ability audit: OVERCHARGE (double fire rate) and BASTION (frontal shot barrier) verified live in the sim; new regression tests pin all three abilities',
@@ -28,14 +43,27 @@
   const $ = (s) => document.querySelector(s);
   const el = (t, cls, html) => { const e = document.createElement(t); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 
-  // ================= save =================
-  const SKEY = 'cbp-save-v1';
-  function defaultSave() {
-    return { cleared: [false, false, false, false, false], stars: [0, 0, 0, 0, 0], unlockedArenas: 1, chars: ['volt'], char: 'volt', crt: true, sfx: true, runs: 0, wins: 0 };
-  }
+  // ================= save (v2, ranked) =================
+  const SKEY = 'cbp-save-v2';
   let SAVE = load();
-  function load() { try { return { ...defaultSave(), ...JSON.parse(localStorage.getItem(SKEY)) }; } catch { return defaultSave(); } }
+  function load() {
+    try {
+      const v2 = JSON.parse(localStorage.getItem(SKEY));
+      if (v2 && v2.v === 2) return { ...PIT.defaultRankedSave(), ...v2 };
+      const v1 = JSON.parse(localStorage.getItem('cbp-save-v1'));
+      if (v1) return PIT.migrateSave(v1); // stars/arenas -> starting SR, not a silent break
+    } catch {}
+    return PIT.defaultRankedSave();
+  }
   function persist() { try { localStorage.setItem(SKEY, JSON.stringify(SAVE)); } catch {} }
+
+  // season rollover: the owner ends a season by bumping PIT.SEASON in engine.js;
+  // the next load here awards that season's peak-rank cosmetic and opens the new one
+  let seasonBanner = null;
+  if (SAVE.season !== PIT.SEASON) {
+    seasonBanner = PIT.seasonEnd(SAVE);
+    persist();
+  }
 
   if (window.PIT_SFX) window.PIT_SFX.setEnabled(SAVE.sfx);
 
@@ -46,39 +74,86 @@
   }
 
   function renderHub() {
-    // arena grid
-    const grid = $('#arena-grid'); grid.innerHTML = '';
-    BOSSES.ARENAS.forEach((a, i) => {
-      const boss = BOSSES.LIST.find(b => b.id === a.boss);
-      const open = i < SAVE.unlockedArenas;
-      const d = el('button', 'arena-card' + (open ? '' : ' locked') + (SAVE.cleared[i] ? ' cleared' : ''));
-      const stars = '★'.repeat(SAVE.stars[i]) + '☆'.repeat(3 - SAVE.stars[i]);
-      d.innerHTML = `
-        <div class="ac-tier">${a.tier}</div>
-        <div class="ac-name">${open ? a.name : 'ARENA ' + (i + 1)}</div>
-        <div class="ac-boss">${open ? boss.name : 'LOCKED'}</div>
-        <div class="ac-stars">${open ? stars : '— — —'}</div>
-        <div class="ac-sub">${open ? (SAVE.cleared[i] ? 'CLEARED' : 'OPEN') : 'clear Arena ' + i + ' to unlock'}</div>`;
-      if (open) d.onclick = () => { PIT_SFX.sfx('click'); startFight(i); };
-      grid.appendChild(d);
+    // rank card — who you are on the ladder right now
+    const prog = PIT.tierProgress(SAVE.sr);
+    const rk = prog.rank;
+    const card = $('#rank-card');
+    const badge = SAVE.cosmetics.length ? `<span class="badge" title="season reward">${SAVE.cosmetics[SAVE.cosmetics.length - 1]}</span>` : '';
+    card.innerHTML = `
+      <div class="rc-left">
+        <div class="rc-rank rk-${rk.name.toLowerCase()}">${PIT.rankLabel(rk)}</div>
+        <div class="rc-sr">${SAVE.sr} SR</div>
+        <div class="rc-bar"><div class="rc-fill rk-${rk.name.toLowerCase()}" style="width:${prog.pct}%"></div></div>
+        <div class="rc-next">${prog.toNext == null ? 'TOP OF THE LADDER' : prog.toNext + ' SR to ' + PIT.rankLabel(PIT.RANKS[PIT.RANKS.indexOf(rk) + 1] || rk)}</div>
+      </div>
+      <div class="rc-right">
+        <div class="rc-season">SEASON ${PIT.SEASON}</div>
+        <div class="rc-peak">PEAK ${SAVE.peakSr} SR</div>
+        <div class="rc-record">${SAVE.wins}W · ${SAVE.losses}L</div>
+        ${badge}
+      </div>`;
+
+    // the ladder — every tier, where you sit
+    const ladder = $('#rank-ladder'); ladder.innerHTML = '';
+    PIT.RANKS.forEach((r, i) => {
+      const cur = r === rk;
+      const mods = PIT.rankMods(r);
+      const row = el('div', 'rl-row' + (cur ? ' current' : '') + (r.name === 'IRIDESCENT' ? ' iri' : ''));
+      row.innerHTML = `
+        <div class="rl-rank rk-${r.name.toLowerCase()}">${PIT.rankLabel(r)}</div>
+        <div class="rl-sr">${r.min}${r.max === Infinity ? '+' : '-' + r.max}</div>
+        <div class="rl-mods">HP ×${mods.hpMult} · GAP ×${mods.gapMult}</div>`;
+      ladder.appendChild(row);
     });
 
-    // character row
+    // Top 5 board
+    const lb = PIT.leaderboardWith(SAVE.sr);
+    const t5 = $('#top5'); t5.innerHTML = '';
+    lb.board.forEach((e, i) => {
+      const row = el('div', 't5-row' + (e.you ? ' you' : ''));
+      row.innerHTML = `<div class="t5-pos">${i + 1}</div><div class="t5-name">${e.name}</div><div class="t5-sr">${e.sr} SR</div>`;
+      t5.appendChild(row);
+    });
+    const foot = el('div', 't5-foot');
+    foot.textContent = lb.you.inBoard ? 'YOU ARE ON THE BOARD' : `YOU — #${lb.you.pos} at ${SAVE.sr} SR` + (lb.qualify ? ' · TOP 5 QUALIFYING' : ` · qualify at ${PIT.TOP5_QUALIFY} SR`);
+    t5.appendChild(foot);
+
+    // operatives — locked by SR now
     const row = $('#char-row'); row.innerHTML = '';
     CHARS.LIST.forEach(c => {
       const owned = SAVE.chars.includes(c.id);
+      const need = PIT.CHAR_UNLOCK_SR[c.id];
       const d = el('button', 'char-card' + (owned ? '' : ' locked') + (SAVE.char === c.id ? ' picked' : ''));
       d.innerHTML = owned ? `
         <div class="cc-name" style="color:${c.tint}">${c.name}</div>
         <div class="cc-role">${c.role}</div>
         <div class="cc-ab">${c.abName} — ${c.abBlurb}</div>
         <div class="cc-stats">${'♥'.repeat(c.hearts)} · SPD ${c.speed} · DASH ${c.dashCd}s</div>`
-        : `<div class="cc-name">???</div><div class="cc-role">LOCKED</div><div class="cc-ab">${c.blurb}</div>`;
+        : `<div class="cc-name">???</div><div class="cc-role">LOCKED — ${need} SR</div><div class="cc-ab">${c.blurb}</div>`;
       if (owned) d.onclick = () => { SAVE.char = c.id; persist(); PIT_SFX.sfx('click'); renderHub(); };
       row.appendChild(d);
     });
 
-    $('#hub-stats').textContent = `RUNS ${SAVE.runs} · KILLS ${SAVE.wins} · STARS ${SAVE.stars.reduce((a, b) => a + b, 0)}/${BOSSES.ARENAS.length * 3}`;
+    $('#hub-stats').textContent = `RUNS ${SAVE.runs} · ${SAVE.wins}W ${SAVE.losses}L · PEAK ${SAVE.peakSr} SR · SEASON ${PIT.SEASON}`;
+
+    // the roster — all fifteen lieutenants of the Tide, grouped by weight class
+    const roster = $('#roster'); roster.innerHTML = '';
+    const BANDS = [
+      { key: 'bronze', label: 'BRONZE WEIGHT — THE WARM-UP' },
+      { key: 'silver', label: 'SILVER WEIGHT — THE DEATHWARRANT AREA' },
+      { key: 'beyond', label: 'BEYOND THE CHAMPION' }
+    ];
+    for (const band of BANDS) {
+      const head = el('div', 'roster-band', band.label);
+      roster.appendChild(head);
+      BOSSES.LIST.forEach((b) => {
+        if (b.band !== band.key) return;
+        const card = el('div', 'roster-boss');
+        card.innerHTML = `<span class="rb-name" style="color:${b.tint}">${b.name}</span><span class="rb-title">${b.title}</span><span class="rb-hp">${b.hp} HP</span><div class="rb-brief">${b.brief}</div>`;
+        roster.appendChild(card);
+      });
+    }
+
     $('#opt-crt').checked = SAVE.crt;
     $('#opt-sfx').checked = SAVE.sfx;
     const ul = $('#update-log-list'); ul.innerHTML = '';
@@ -99,12 +174,21 @@
   const keys = {};
   let particles = [];
 
-  function startFight(arenaIndex) {
-    st = PIT.createRun({ arenaIndex, charId: SAVE.char, seed: (Date.now() & 0xffffff) >>> 0 });
+  function startRanked() {
+    // random rotation: the rank's pool decides which boss you face (bosses.js LIST index)
+    const rk = PIT.rankFor(SAVE.sr);
+    const pool = rk.pool;
+    const bossIndex = pool[Math.floor(Math.random() * pool.length)];
+    startFight(bossIndex, rk);
+  }
+
+  function startFight(bossIndex, rk) {
+    rk = rk || PIT.rankFor(SAVE.sr);
+    st = PIT.createRun({ boss: bossIndex, charId: SAVE.char, seed: (Date.now() & 0xffffff) >>> 0, mods: PIT.rankMods(rk) });
     particles = []; acc = 0; overT = 0; paused = false;
     SAVE.runs++; persist();
     show('fight');
-    $('#fight-title').textContent = `${st.arena.name} — ${st.bossDef.name}`;
+    $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${st.mods.hpMult} GAP ×${st.mods.gapMult}`;
     running = true; last = performance.now();
     requestAnimationFrame(loop);
   }
@@ -112,46 +196,37 @@
   function endFight() {
     running = false;
     const win = st.over === 'win';
-    const stars = win ? PIT.computeStars(st.hitsTaken) : 0;
-    let banners = [];
-    if (win) {
-      SAVE.wins++;
-      const res = PIT.applyResult(SAVE, st.arenaIndex, stars);
-      persist();
-      if (res.arenaUnlocked != null) banners.push(`ARENA ${res.arenaUnlocked + 1} UNLOCKED`);
-      res.newChars.forEach(id => {
-        const c = CHARS.LIST.find(x => x.id === id);
-        banners.push(`OPERATIVE UNLOCKED: ${c.name} — ${c.abName}`);
-      });
-    } else persist();
-    showResult(win, stars, banners);
+    const heartsLost = st.player.maxHearts - Math.max(0, st.player.hearts);
+    const res = PIT.applyRankedResult(SAVE, win, heartsLost);
+    persist();
+    showResult(win, res, heartsLost);
   }
 
-  function showResult(win, stars, banners) {
+  function showResult(win, res, heartsLost) {
     const box = $('#result');
     box.hidden = false;
     box.innerHTML = '';
-    box.appendChild(el('h2', win ? 'gold' : 'crimson', win ? 'ARENA CLEARED' : 'FLATLINED'));
+    box.appendChild(el('h2', win ? 'gold' : 'crimson', win ? 'BOSS DOWN' : 'FLATLINED'));
+    const after = PIT.rankFor(SAVE.sr);
+    const deltaCls = res.delta >= 0 ? 'gold' : 'crimson';
+    box.appendChild(el('div', 'sr-delta ' + deltaCls, (res.delta >= 0 ? '+' : '') + res.delta + ' SR'));
     if (win) {
-      const s = el('div', 'result-stars');
-      for (let i = 0; i < 3; i++) {
-        const star = el('span', 'rstar' + (i < stars ? ' on' : ''), '★');
-        s.appendChild(star);
-        setTimeout(() => { star.classList.add('pop'); PIT_SFX.sfx('star'); }, 350 + i * 380);
-      }
-      box.appendChild(s);
-      box.appendChild(el('p', 'result-sub', st.hitsTaken === 0 ? 'FLAWLESS — no hits taken' : `hits taken: ${st.hitsTaken}`));
+      const label = heartsLost === 0 ? 'CLEAN WIN — full HP' : `${heartsLost} heart${heartsLost === 1 ? '' : 's'} lost`;
+      box.appendChild(el('p', 'result-sub', `${label} · boss HP was ${Math.round(100 * st.boss.hp / st.boss.maxHp)}% of a ${st.bossDef.name} at ${PIT.rankLabel(PIT.rankFor(SAVE.sr))} pacing`));
     } else {
-      box.appendChild(el('p', 'result-sub', `The Tide keeps the Pit. Boss HP was ${Math.max(0, Math.round(100 * st.boss.hp / st.boss.maxHp))}% left.`));
+      box.appendChild(el('p', 'result-sub', `The Tide keeps the SR. Boss HP was ${Math.max(0, Math.round(100 * st.boss.hp / st.boss.maxHp))}% left.`));
     }
-    banners.forEach(b => box.appendChild(el('div', 'banner', b)));
+    if (res.promoted) { const b = el('div', 'banner gold', `PROMOTED — ${PIT.rankLabel(res.promoted)}`); box.appendChild(b); }
+    if (res.demoted) { const b = el('div', 'banner crimson', `DEMOTED — ${PIT.rankLabel(res.demoted)}`); box.appendChild(b); }
+    res.newChars.forEach(id => {
+      const c = CHARS.LIST.find(x => x.id === id);
+      box.appendChild(el('div', 'banner', `OPERATIVE UNLOCKED: ${c.name} — ${c.abName}`));
+    });
+    if (seasonBanner) { box.appendChild(el('div', 'banner gold', `SEASON ${seasonBanner.from} ENDED — REWARD: ${seasonBanner.badge}`)); seasonBanner = null; }
+    box.appendChild(el('p', 'result-sub', `Now ${PIT.rankLabel(after)} · ${SAVE.sr} SR`));
     const row = el('div', 'result-btns');
-    const retry = el('button', 'btn', 'RETRY'); retry.onclick = () => { PIT_SFX.sfx('click'); box.hidden = true; startFight(st.arenaIndex); };
-    row.appendChild(retry);
-    if (win && st.arenaIndex + 1 < BOSSES.ARENAS.length) {
-      const next = el('button', 'btn gold', 'NEXT ARENA'); next.onclick = () => { PIT_SFX.sfx('click'); box.hidden = true; startFight(st.arenaIndex + 1); };
-      row.appendChild(next);
-    }
+    const again = el('button', 'btn', 'QUEUE AGAIN'); again.onclick = () => { PIT_SFX.sfx('click'); box.hidden = true; startRanked(); };
+    row.appendChild(again);
     const hub = el('button', 'btn ghost', 'HUB'); hub.onclick = () => { PIT_SFX.sfx('click'); box.hidden = true; show('hub'); };
     row.appendChild(hub);
     box.appendChild(row);
@@ -364,6 +439,49 @@
         px(x - r, y - 2, r * 2, r, tint);
         px(x - r + 3, y - r, r * 2 - 6, r + 2, flash ? C.white : '#a86f38');
         px(x - 4, y - r + 1, 3, 3, C.gold); px(x + 2, y - r + 3, 3, 3, C.gold); break; // sacs
+      case 'gnasher':
+        px(x - r + 1, y - r + 2, r * 2 - 2, r * 2 - 2, tint);
+        px(x - r - 2, y - 2, 4, 3, dark); px(x + r - 2, y - 2, 4, 3, dark); // jaws
+        px(x - 3, y - 3, 2, 2, flash ? C.white : C.void); px(x + 1, y - 3, 2, 2, flash ? C.white : C.void); break; // eyes
+      case 'cindermite':
+        px(x - r, y - r + 4, r * 2, r * 2 - 4, tint);
+        px(x - r + 2, y - r, r * 2 - 4, 4, dark);
+        px(x - 5, y + 2, 4, 4, flash ? C.white : '#e07a2c'); px(x + 2, y - 1, 3, 3, flash ? C.white : '#e07a2c'); break; // ash vents
+      case 'thresher':
+        px(x - r + 2, y - r, r * 2 - 4, r * 2, tint);
+        px(x - r - 3, y - 1, 5, 2, flash ? C.white : C.tealite); px(x + r - 2, y - 1, 5, 2, flash ? C.white : C.tealite); // chain tips
+        px(x - 2, y - r + 2, 4, 4, flash ? C.white : C.void); break;
+      case 'paleherald':
+        px(x - 2, y - r - 2, 4, r * 2 + 4, tint); // herald standard
+        px(x - r + 1, y - 3, r * 2 - 2, 6, tint);
+        px(x - r, y - 1, r, 2, flash ? C.white : C.gold); px(x, y - 1, r, 2, flash ? C.white : C.gold); break;
+      case 'gloamwarden':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 2, y - 2, r * 2 - 4, 3, dark);
+        px(x - r + 1, y - r + 1, 3, 3, flash ? C.white : C.tealite); px(x + r - 4, y - r + 1, 3, 3, flash ? C.white : C.tealite); break; // vault lamps
+      case 'carrionlaw':
+        px(x - r, y - r, r * 2, r * 2, tint);
+        px(x - r + 2, y - r + 2, r * 2 - 4, r * 2 - 4, dark);
+        px(x - 1, y - r - 3, 2, 4, C.gold); // gavel spike
+        px(x - 3, y + 1, 6, 2, flash ? C.white : C.void); break;
+      case 'ironchoir':
+        px(x - r + 1, y - r, r * 2 - 2, r * 2, tint);
+        px(x - r - 1, y - r + 3, 2, r * 2 - 6, flash ? C.white : C.gray);
+        px(x + r - 1, y - r + 3, 2, r * 2 - 6, flash ? C.white : C.gray); // organ pipes
+        px(x - 2, y - 2, 4, 4, flash ? C.white : C.gold); break;
+      case 'fathom':
+        px(x - r + 3, y - r, r * 2 - 6, r * 2, tint);
+        px(x - r, y - 2, r * 2, 4, dark);
+        px(x - 4, y - r + 2, 3, 3, C.tealite); px(x + 2, y - r + 4, 3, 3, C.tealite); px(x - 1, y + 2, 3, 3, C.tealite); break; // deep eyes
+      case 'gravewake':
+        px(x - r, y - r + 1, r * 2, r * 2 - 2, tint);
+        px(x - r + 2, y - r - 2, 4, 4, dark); px(x + r - 6, y - r - 2, 4, 4, dark); // split crown
+        px(x - 4, y, 8, 3, flash ? C.white : C.void); px(x - 2, y - 4, 4, 2, flash ? C.white : C.crimlite); break;
+      case 'nullsovereign':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 1, y - r - 3, 3, 5, C.gold); px(x + r - 4, y - r - 3, 3, 5, C.gold); px(x - 2, y - r - 4, 4, 6, C.gold); // triple crown
+        px(x - 6, y - 3, 12, 5, flash ? C.white : C.void);
+        px(x - 4, y - 2, 2, 2, C.crimson); px(x + 2, y - 2, 2, 2, C.crimson); break;
       default: // deathwarrant
         px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
         px(x - r + 2, y - r - 3, 3, 5, C.gold); px(x + r - 5, y - r - 3, 3, 5, C.gold); // crown
@@ -420,11 +538,7 @@
 
   // ================= boot =================
   document.body.classList.toggle('no-crt', !SAVE.crt);
-  $('#btn-play').onclick = () => { PIT_SFX.sfx('click'); startFight(firstOpenArena()); };
-  function firstOpenArena() {
-    for (let i = BOSSES.ARENAS.length - 1; i >= 0; i--) if (SAVE.cleared[i]) return Math.min(i + 1, BOSSES.ARENAS.length - 1);
-    return 0;
-  }
+  $('#btn-play').onclick = () => { PIT_SFX.sfx('click'); startRanked(); };
   renderHub();
-  window.__PIT = { get state() { return st; }, PIT };
+  window.__PIT = { get state() { return st; }, PIT, get save() { return SAVE; } };
 })();

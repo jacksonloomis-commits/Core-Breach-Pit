@@ -40,20 +40,26 @@
   }
 
   // ---------- run creation ----------
+  // opts.boss is a bosses.js LIST index (ranked pools store indices) or a boss id.
   function createRun(opts) {
-    const arena = BOSSES.ARENAS[opts.arenaIndex];
-    if (!arena) throw new Error('unknown arena ' + opts.arenaIndex);
+    const idx = typeof opts.boss === 'number' ? opts.boss : BOSSES.LIST.findIndex(b => b.id === opts.boss);
+    const bossDef = BOSSES.LIST[idx];
+    if (!bossDef) throw new Error('unknown boss ' + opts.boss);
     const char = CHARS.LIST.find(c => c.id === opts.charId);
     if (!char) throw new Error('unknown char ' + opts.charId);
-    const bossDef = BOSSES.LIST.find(b => b.id === arena.boss);
-    if (!bossDef) throw new Error('unknown boss ' + arena.boss);
+
+    // ranked modifiers: higher ranks fight the same bosses with more HP and tighter
+    // pacing. Telegraphs and projectile/charge speeds are NEVER scaled — the fairness
+    // law (tele >= 0.5s, speed caps) must hold at every rank.
+    const mods = opts.mods || {};
+    const hpMult = clamp(typeof mods.hpMult === 'number' ? mods.hpMult : 1, 1, 3);
+    const gapMult = clamp(typeof mods.gapMult === 'number' ? mods.gapMult : 1, 0.5, 1);
 
     const state = {
       t: 0,
       seed: (opts.seed != null ? opts.seed : (Date.now() ^ (Math.random() * 0xffffffff))) >>> 0,
       rng: null,
-      arenaIndex: opts.arenaIndex,
-      arena: arena,
+      bossIndex: idx,
       char: char,
       bossDef: bossDef,
       player: {
@@ -68,10 +74,11 @@
       },
       boss: {
         x: (AR.x0 + AR.x1) / 2, y: AR.y0 + 30, r: bossDef.r || 10,
-        hp: bossDef.hp, maxHp: bossDef.hp,
-        phase: 0, rt: { mode: 'gap', timer: 1.2, pat: null, patIdx: -1 },
+        hp: Math.round(bossDef.hp * hpMult), maxHp: Math.round(bossDef.hp * hpMult),
+        phase: 0, rt: { mode: 'gap', timer: 1.2 * gapMult, pat: null, patIdx: -1 },
         hitFlash: 0
       },
+      mods: { hpMult, gapMult },
       proj: [], zones: [], beams: [], minions: [], tracers: [],
       shield: 0,
       hitsTaken: 0,
@@ -309,7 +316,7 @@
     while (b.phase < def.phases.length - 1 && b.hp / b.maxHp <= def.phases[b.phase + 1].until) {
       b.phase++;
       st.proj.length = 0; st.zones.length = 0; st.beams.length = 0; // fairness wipe
-      b.rt = { mode: 'gap', timer: 1.1, pat: null, patIdx: -1 };
+      b.rt = { mode: 'gap', timer: 1.1 * st.mods.gapMult, pat: null, patIdx: -1 };
       st.events.push({ type: 'phase', n: b.phase });
     }
     ph = def.phases[b.phase];
@@ -340,7 +347,7 @@
       }
     } else if (rt.mode === 'recover' && rt.timer <= 0) {
       rt.mode = 'gap';
-      rt.timer = ph.gap * (ph.enrage ? 0.78 : 1);
+      rt.timer = ph.gap * st.mods.gapMult * (ph.enrage ? 0.78 : 1);
     }
 
     // --- projectiles
@@ -408,27 +415,151 @@
     else if (ch.ability === 'bastion') { st.shield = 4; st.events.push({ type: 'ability', id: 'bastion' }); }
   }
 
-  // ---------- scoring / progression (pure) ----------
-  function computeStars(hitsTaken) {
-    if (hitsTaken === 0) return 3;
-    if (hitsTaken <= 2) return 2;
-    return 1;
+  // ---------- ranked ladder (RANKED BETA) ----------
+  // SR economy (owner spec): wins bank SR by hearts kept; a flatline costs SR.
+  // SR never resets — seasons only award cosmetics on top.
+  const SR = { WIN_FULL: 30, WIN_ONE: 15, WIN_TWO: -5, WIN_THREE_PLUS: -20, LOSS: -10 };
+  function srDelta(win, heartsLost) {
+    if (!win) return SR.LOSS;
+    if (heartsLost <= 0) return SR.WIN_FULL;
+    if (heartsLost === 1) return SR.WIN_ONE;
+    if (heartsLost === 2) return SR.WIN_TWO;
+    return SR.WIN_THREE_PLUS;
   }
 
-  // save shape: { cleared:[bool], stars:[num], unlockedArenas:num, chars:[ids], char:id }
-  function applyResult(save, arenaIndex, stars) {
-    const res = { newChars: [], arenaUnlocked: null };
-    save.cleared[arenaIndex] = true;
-    save.stars[arenaIndex] = Math.max(save.stars[arenaIndex] || 0, stars);
-    const next = arenaIndex + 1;
-    if (next < BOSSES.ARENAS.length && !save.cleared[next] && res.arenaUnlocked == null) {
-      if (save.unlockedArenas <= next) { save.unlockedArenas = next + 1; res.arenaUnlocked = next; }
+  // Difficulty knobs per rank: the same bosses with more HP and tighter pacing.
+  // Telegraphs and speeds are NEVER scaled (fairness law holds at every rank).
+  // SILVER is pinned near identity (1.05/0.95) by owner spec: a silver roll must feel
+  // like the DEATHWARRANT fight itself, not 30% past it. Escalation continues from Gold up.
+  const RANK_MODS = {
+    BRONZE: { hpMult: 1.0, gapMult: 1.0 },
+    SILVER: { hpMult: 1.05, gapMult: 1.0 },
+    GOLD: { hpMult: 1.2, gapMult: 0.9 },
+    PLATINUM: { hpMult: 1.5, gapMult: 0.85 },
+    DIAMOND: { hpMult: 1.7, gapMult: 0.8 },
+    CRIMSON: { hpMult: 1.85, gapMult: 0.75 },
+    IRIDESCENT: { hpMult: 2.0, gapMult: 0.7 }
+  };
+
+  // Boss pools (owner spec, BOSS EXPANSION): indices into bosses.js LIST.
+  //   bronze band [0-4]   — the easy warm-up, unchanged feel ("super ez" by design)
+  //   silver band [5-10]  — THE DEATHWARRANT AREA: champion-weight bosses; every roll
+  //                         is bot-proven 3/3 at the SILVER preset
+  //   beyond band [11-14] — past the champion, platinum+ only
+  // Bot gates: every boss is proven at BASE and the bronze+silver ladder presets 3/3.
+  // PLATINUM+ presets are the designed beyond-bot wall — humans outplay the bot there
+  // (see AGENTS.md; the suite survival-gates them instead of demanding full clears).
+  const RANKS = [
+    { name: 'BRONZE', tier: 1, min: 0, max: 200, pool: [0, 1, 2, 3, 4] },
+    { name: 'BRONZE', tier: 2, min: 200, max: 300, pool: [0, 1, 2, 3, 4] },
+    { name: 'BRONZE', tier: 3, min: 300, max: 500, pool: [0, 1, 2, 3, 4] },
+    { name: 'SILVER', tier: 1, min: 500, max: 600, pool: [5, 6, 7, 8, 9, 10] },
+    { name: 'SILVER', tier: 2, min: 600, max: 700, pool: [5, 6, 7, 8, 9, 10] },
+    { name: 'SILVER', tier: 3, min: 700, max: 800, pool: [5, 6, 7, 8, 9, 10] },
+    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [8, 9, 10, 11] },
+    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [8, 9, 10, 11] },
+    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [11, 12, 13] },
+    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [11, 12, 13] },
+    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [11, 12, 13] },
+    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [11, 12, 13] },
+    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [11, 12, 13] },
+    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [11, 12, 13] },
+    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [12, 13, 14] },
+    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [12, 13, 14] },
+    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [12, 13, 14] },
+    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [13, 14] }
+  ];
+
+  function rankFor(sr) {
+    for (const r of RANKS) if (sr < r.max) return r;
+    return RANKS[RANKS.length - 1];
+  }
+  function rankLabel(r) { return r.name === 'IRIDESCENT' ? r.name : `${r.name} ${r.tier}`; }
+  function rankMods(r) { return RANK_MODS[r.name]; }
+  function tierProgress(sr) {
+    const r = rankFor(sr);
+    if (r.max === Infinity) return { rank: r, pct: 100, toNext: null };
+    return { rank: r, pct: clamp(Math.round((100 * (sr - r.min)) / (r.max - r.min)), 0, 100), toNext: r.max - sr };
+  }
+
+  // operatives unlock by SR now (were arena clears)
+  const CHAR_UNLOCK_SR = { ghost: 500, bulwark: 1100 };
+
+  function applyRankedResult(save, win, heartsLost) {
+    const res = { delta: srDelta(win, heartsLost), newChars: [], promoted: null, demoted: null };
+    const before = rankFor(save.sr);
+    save.sr = Math.max(0, save.sr + res.delta);
+    save.peakSr = Math.max(save.peakSr || 0, save.sr);
+    save.seasonPeak = Math.max(save.seasonPeak || 0, save.sr);
+    if (win) save.wins = (save.wins || 0) + 1; else save.losses = (save.losses || 0) + 1;
+    const after = rankFor(save.sr);
+    if (rankLabel(after) !== rankLabel(before)) {
+      if (RANKS.indexOf(after) > RANKS.indexOf(before)) res.promoted = after;
+      else res.demoted = after;
     }
-    for (const u of BOSSES.ARENAS[arenaIndex].unlocks || []) {
-      if (!save.chars.includes(u)) { save.chars.push(u); res.newChars.push(u); }
+    for (const [id, need] of Object.entries(CHAR_UNLOCK_SR)) {
+      if (save.sr >= need && !save.chars.includes(id)) { save.chars.push(id); res.newChars.push(id); }
     }
     return res;
   }
 
-  return { W, H, HUD, AR, CHARS, BOSSES, createRun, step, hurt, computeStars, applyResult, mulberry32, segDist, clamp, dist };
+  // ---------- Top 5 (season leaderboard) ----------
+  const TOP5_QUALIFY = 4000; // Iridescent Top-5 qualifying number (owner spec)
+  const TOP5_MOCK = [ // beta stand-ins until a real backend exists; YOU slots in by SR
+    { name: 'Numbugger', sr: 8900 },
+    { name: 'Jeff', sr: 6600 },
+    { name: 'Biffle', sr: 5090 },
+    { name: 'Loomis', sr: 5080 },
+    { name: 'Peterbot', sr: 4900 }
+  ];
+  function leaderboardWith(sr) {
+    const all = TOP5_MOCK.map(e => ({ ...e })).concat([{ name: 'YOU', sr, you: true }]);
+    all.sort((a, b) => b.sr - a.sr);
+    const youIdx = all.findIndex(e => e.you);
+    return { board: all.slice(0, 5), you: { pos: youIdx + 1, sr, inBoard: youIdx >= 0 && youIdx < 5 }, qualify: sr >= TOP5_QUALIFY };
+  }
+
+  // ---------- seasons ----------
+  // Bump SEASON in code to end the current season (owner call): the next load awards
+  // a cosmetic badge for that season's peak rank and opens the next one. SR carries.
+  const SEASON = 1;
+  function defaultRankedSave() {
+    return { v: 2, sr: 0, peakSr: 0, season: SEASON, seasonPeak: 0, cosmetics: [], chars: ['volt'], char: 'volt', crt: true, sfx: true, runs: 0, wins: 0, losses: 0 };
+  }
+  function seasonEnd(save) {
+    const res = { badge: null, from: save.season };
+    const r = rankFor(save.seasonPeak || 0);
+    res.badge = `S${save.season}-${r.name}${r.name === 'IRIDESCENT' ? '' : r.tier}`;
+    if (!save.cosmetics.includes(res.badge)) save.cosmetics.push(res.badge);
+    save.season = SEASON;
+    save.seasonPeak = save.sr;
+    return res;
+  }
+
+  // ---------- migration (cbp-save-v1 stars/arenas -> v2 ranked) ----------
+  // Not a silent break: old progress converts to starting SR — 100 per cleared arena
+  // plus 20 per star. A full 5-arena / 15-star save lands at 800 SR (Gold 1).
+  function migrateSave(old) {
+    const s = defaultRankedSave();
+    let sr = 0;
+    const cleared = Array.isArray(old.cleared) ? old.cleared : [];
+    const stars = Array.isArray(old.stars) ? old.stars : [];
+    for (let i = 0; i < cleared.length; i++) if (cleared[i]) sr += 100;
+    for (let i = 0; i < stars.length; i++) sr += (stars[i] || 0) * 20;
+    s.sr = sr; s.peakSr = sr; s.seasonPeak = sr;
+    if (Array.isArray(old.chars) && old.chars.length) s.chars = old.chars.slice();
+    if (typeof old.char === 'string') s.char = old.char;
+    if (old.crt === false) s.crt = false;
+    if (old.sfx === false) s.sfx = false;
+    s.runs = old.runs || 0;
+    s.wins = old.wins || 0;
+    return s;
+  }
+
+  return {
+    W, H, HUD, AR, CHARS, BOSSES, createRun, step, hurt, mulberry32, segDist, clamp, dist,
+    SR, srDelta, RANKS, RANK_MODS, rankFor, rankLabel, rankMods, tierProgress,
+    CHAR_UNLOCK_SR, applyRankedResult, TOP5_QUALIFY, TOP5_MOCK, leaderboardWith,
+    SEASON, defaultRankedSave, seasonEnd, migrateSave
+  };
 });

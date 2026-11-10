@@ -16,7 +16,7 @@
     },
     {
       id: 'ghost', name: 'GHOST', role: 'TIDE STALKER',
-      blurb: 'Unlocked: clear Arena II. Slippery frame, short dash cycle, light gun.',
+      blurb: 'Unlocks at SILVER (500 SR). Slippery frame, short dash cycle, light gun.',
       hearts: 3, speed: 82, dashCd: 0.8, dashI: 0.3, dmg: 0.75,
       ability: 'phase', abName: 'PHASE', abCd: 14,
       abBlurb: '2 seconds of intangibility. Walk through anything.',
@@ -24,7 +24,7 @@
     },
     {
       id: 'bulwark', name: 'BULWARK', role: 'SIEGE FRAME',
-      blurb: 'Unlocked: clear Arena IV. Slow, heavy, hard to kill, hits like a siege engine.',
+      blurb: 'Unlocks at PLATINUM (1100 SR). Slow, heavy, hard to kill, hits like a siege engine.',
       hearts: 4, speed: 56, dashCd: 1.5, dashI: 0.35, dmg: 1.2,
       ability: 'bastion', abName: 'BASTION', abCd: 15,
       abBlurb: '4-second frontal barrier that deletes incoming shots.',

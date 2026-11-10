@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CORE BREACH: PIT // Boss-Rush Arena</title>
-  <link rel="stylesheet" href="styles.css?v=20261110e">
+  <title>CORE BREACH: PIT // Ranked Boss-Rush Arena</title>
+  <link rel="stylesheet" href="styles.css?v=20261110f">
 </head>
 <body>
   <div id="app">
@@ -13,17 +13,28 @@
     <section id="screen-hub" class="screen">
       <header class="hub-head">
         <h1 class="title">CORE BREACH<span class="t-sub">// PIT</span></h1>
-        <p class="tagline">THE CRIMSON TIDE SENDS ITS LIEUTENANTS. SEND THEM BACK.</p>
+        <p class="tagline">THE CRIMSON TIDE SENDS ITS LIEUTENANTS. SEND THEM BACK. CLIMB THE LADDER.</p>
         <div id="hub-stats" class="hub-stats"></div>
       </header>
 
       <button id="btn-play" class="btn gold big">ENTER THE PIT</button>
 
-      <h2 class="sect">ARENAS</h2>
-      <div id="arena-grid" class="arena-grid"></div>
+      <div class="rank-wrap">
+        <div id="rank-card" class="rank-card"></div>
+        <div class="rank-side">
+          <h2 class="sect">TOP 5</h2>
+          <div id="top5" class="t5"></div>
+        </div>
+      </div>
+
+      <h2 class="sect">THE LADDER</h2>
+      <div id="rank-ladder" class="rank-ladder"></div>
 
       <h2 class="sect">OPERATIVES</h2>
       <div id="char-row" class="char-row"></div>
+
+      <h2 class="sect">THE ROSTER</h2>
+      <div id="roster" class="roster"></div>
 
       <div class="hub-cols">
         <div class="hub-col">
@@ -32,7 +43,7 @@
             <p><b>WASD / Arrows</b> — move · <b>SPACE / SHIFT</b> — dash (brief invincibility) · <b>E</b> — ability · <b>P / ESC</b> — pause</p>
             <p>Your gun fires at the nearest hostile automatically. You position, you dash, you survive.</p>
             <p>Every boss attack is <b>telegraphed</b> — gold flash, dashed lines, pool outlines. Nothing hurts you without warning. Dash THROUGH beams, not away from them.</p>
-            <p><b>Stars:</b> 3 = no hits taken · 2 = two hits or fewer · 1 = cleared. Clear an arena to open the next. Clear Arena II for <b>GHOST</b>, Arena IV for <b>BULWARK</b>.</p>
+            <p><b>Ranked:</b> each queue rolls a random boss from your rank's pool. Wins bank SR by the hearts you keep; flatlining costs SR. Higher ranks send the same lieutenants with more HP and tighter pacing — Silver walls you with the <b>DEATHWARRANT weight class</b>. GHOST unlocks at Silver (500 SR), BULWARK at Platinum (1100 SR).</p>
           </div>
           <h2 class="sect">OPTIONS</h2>
           <label class="opt"><input type="checkbox" id="opt-crt"> CRT scanlines</label>
@@ -42,7 +53,7 @@
           <h2 class="sect">UPDATE LOG</h2>
           <ul id="update-log-list" class="uplog"></ul>
           <h2 class="sect">CREDITS</h2>
-          <p class="credits">A spinoff of <b>CORE BREACH: ZERO</b> — the tower-defense war against the Crimson Tide, live at the Gamble Limited Ltd site. Boss-rush rules engine is pure and test-driven; arenas are proven winnable by a dodge-bot before every release.</p>
+          <p class="credits">A spinoff of <b>CORE BREACH: ZERO</b> — the tower-defense war against the Crimson Tide, live at the Gamble Limited Ltd site. Boss-rush rules engine is pure and test-driven; the roster is proven winnable by a dodge-bot before every release.</p>
         </div>
       </div>
     </section>
@@ -67,13 +78,13 @@
     </section>
   </div>
 
-  <footer id="build-foot">BUILD 2026.11.10 // CORE BREACH: PIT — OPEN BETA</footer>
+  <footer id="build-foot">BUILD 2026.11.11 // CORE BREACH: PIT — BOSS EXPANSION</footer>
 
-  <script src="palette.js?v=20261110e"></script>
-  <script src="chars.js?v=20261110e"></script>
-  <script src="bosses.js?v=20261110e"></script>
-  <script src="engine.js?v=20261110e"></script>
-  <script src="audio.js?v=20261110e"></script>
-  <script src="app.js?v=20261110e"></script>
+  <script src="palette.js?v=20261110f"></script>
+  <script src="chars.js?v=20261110f"></script>
+  <script src="bosses.js?v=20261110f"></script>
+  <script src="engine.js?v=20261110f"></script>
+  <script src="audio.js?v=20261110f"></script>
+  <script src="app.js?v=20261110f"></script>
 </body>
 </html>
