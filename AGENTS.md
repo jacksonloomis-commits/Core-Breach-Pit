@@ -12,8 +12,8 @@ Rules for every agent and human working on CORE BREACH: PIT. Read this first, ev
 - **The dodge-bot must clear every arena on 3/3 fixed seeds** before a new arena or boss change merges. If it can't, fix the pattern, not the test.
 - Bump `?v=` cache-bust strings in `index.html` whenever any root asset changes.
 - Overlays shown/hidden via the `hidden` attribute must never have an author CSS `display:` rule win over it — `styles.css` carries a global `[hidden] { display: none !important; }` for this (a missing copy once left the PAUSED screen stuck over every fight). Do not remove it.
-- Version stamp in the same commit: `BUILD` const + `UPDATE_LOG` entry in `app.js`, `BUILD <ver> // <TAG>` footer in `index.html`. Current: BUILD 2026.11.10 // BALANCE + UI PASS, bust `20261110d`.
-- Balance changes are gated twice: the dodge-bot must still clear every arena 3/3 (Arena I flawless), and the dashless "casual" reference in the balance probe must survive Arena I but not the later ones — if the bot goes flawless everywhere, the game is too easy; if it dies anywhere, the game is broken.
+- Version stamp in the same commit: `BUILD` const + `UPDATE_LOG` entry in `app.js`, `BUILD <ver> // <TAG>` footer in `index.html`. Current: BUILD 2026.11.10 // ABILITY HOTFIX, bust `20261110e`.
+- Balance changes are gated twice: the dodge-bot must still clear every arena 3/3 (Arena I flawless), and the dashless casual reference (same bot brain, dash disabled) must clear Arena I on at least half its seeds while never clearing Arenas II, III or V — Arena IV's HIVE MOTHER is knowingly kite-able without dash (spiral gaps). If the dashless bot starts clearing the dash-gated arenas, the ladder is too easy; if it dies on most Arena I seeds, the tutorial is too hard.
 - Keep `README.md` and `AGENTS.md` current in the same commit as the change.
 - Save format is `cbp-save-v1` in localStorage; changing its shape needs a migration, not a silent break.
 - Deploy is GitHub Pages from `main` root. After every push: poll the Pages URL and grep the BUILD footer before declaring the deploy live.

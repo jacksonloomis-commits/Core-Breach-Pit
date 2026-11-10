@@ -99,12 +99,14 @@ function botInput(st) {
 }
 
 // ---------- sim harness ----------
-function runFight(arenaIndex, charId, seed, capSec) {
+function runFight(arenaIndex, charId, seed, capSec, opts = {}) {
   const st = PIT.createRun({ arenaIndex, charId, seed });
   const dt = 1 / 60;
   let steps = Math.round(capSec / dt);
   while (steps-- > 0 && !st.over) {
-    PIT.step(st, dt, botInput(st));
+    const inp = botInput(st);
+    if (opts.dashless) inp.dash = false; // casual reference: same brain, no dash
+    PIT.step(st, dt, inp);
     if (st.over === 'win') break;
   }
   return { st, time: st.t };
@@ -171,6 +173,95 @@ console.log('--- Rules ---');
   }
 }
 
+// ================= abilities =================
+console.log('--- Abilities ---');
+{
+  // PHASE (GHOST): p.phase must gate hurt() — it once was cosmetic (set + decayed, never read)
+  const st = PIT.createRun({ arenaIndex: 0, charId: 'ghost', seed: 42 });
+  PIT.step(st, 1 / 60, { mx: 0, my: 0, ability: true });
+  check('PHASE activates on E (2s window, cd starts)', st.player.phase > 1.95 && st.player.abCd > 13.9);
+  st.proj.push({ x: st.player.x, y: st.player.y, vx: 0, vy: 0, r: 3 });
+  PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+  check('PHASE: shot passes through without damage', st.player.hearts === 3 && st.proj.length === 1);
+  st.zones.push({ x: st.player.x, y: st.player.y, r: 10, until: st.t + 5, hitCd: 0 });
+  st.minions.push({ x: st.player.x, y: st.player.y, r: 3, hp: 14, hitFlash: 0 });
+  const bx = st.boss.x, by = st.boss.y;
+  st.boss.x = st.player.x; st.boss.y = st.player.y;
+  st.player.invuln = 0; st.player.dashI = 0;
+  PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+  st.boss.x = bx; st.boss.y = by;
+  check('PHASE: pool, minion and boss contact do nothing', st.player.hearts === 3);
+  const cdNow = st.player.abCd;
+  PIT.step(st, 1 / 60, { mx: 0, my: 0, ability: true });
+  check('PHASE cannot re-cast while on cooldown', st.player.abCd < cdNow && st.player.abCd > 13.5 && st.player.phase < 1.98);
+  st.player.phase = 2;
+  for (let i = 0; i < 130; i++) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+  check('PHASE expires after 2s', st.player.phase === 0);
+  st.player.invuln = 0; st.player.dashI = 0; st.proj.length = 0;
+  const hBefore = st.player.hearts;
+  st.proj.push({ x: st.player.x, y: st.player.y, vx: 0, vy: 0, r: 3 });
+  PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+  check('hittable again once PHASE ends', st.player.hearts === hBefore - 1);
+  // beam while phased (separate state — beams persist until the next sweep and would pollute other checks)
+  const stB = PIT.createRun({ arenaIndex: 0, charId: 'ghost', seed: 42 });
+  PIT.step(stB, 1 / 60, { mx: 0, my: 0, ability: true });
+  stB.beams.push({ x: stB.boss.x, y: stB.boss.y, ang: Math.atan2(stB.player.y - stB.boss.y, stB.player.x - stB.boss.x), w: 12 });
+  stB.player.invuln = 0; stB.player.dashI = 0;
+  PIT.step(stB, 1 / 60, { mx: 0, my: 0 });
+  check('PHASE: laser sweep does nothing', stB.player.hearts === 3);
+  // control: the identical setup lands when NOT phased
+  const stC = PIT.createRun({ arenaIndex: 0, charId: 'ghost', seed: 42 });
+  stC.player.invuln = 0; stC.player.dashI = 0;
+  stC.proj.push({ x: stC.player.x, y: stC.player.y, vx: 0, vy: 0, r: 3 });
+  PIT.step(stC, 1 / 60, { mx: 0, my: 0 });
+  check('control: same shot hits when not phased', stC.player.hearts === 2);
+
+  // OVERCHARGE (VOLT): fire interval halves while rage is up
+  const stV = PIT.createRun({ arenaIndex: 0, charId: 'volt', seed: 42 });
+  stV.player.fireT = 0;
+  PIT.step(stV, 1 / 60, { mx: 0, my: 0 });
+  const baseRate = stV.player.fireT;
+  stV.player.fireT = 0; stV.player.rage = 1;
+  PIT.step(stV, 1 / 60, { mx: 0, my: 0 });
+  check('OVERCHARGE doubles fire rate (0.26s -> 0.13s)', Math.abs(baseRate - 0.26) < 0.001 && Math.abs(stV.player.fireT - 0.13) < 0.001);
+  PIT.step(stV, 1 / 60, { mx: 0, my: 0, ability: true });
+  check('OVERCHARGE activates on E', stV.player.rage > 2.9);
+  for (let i = 0; i < 190; i++) PIT.step(stV, 1 / 60, { mx: 0, my: 0 });
+  check('OVERCHARGE expires after 3s', stV.player.rage === 0);
+
+  // BASTION (BULWARK): frontal cone deletes shots, the back stays exposed
+  const stW = PIT.createRun({ arenaIndex: 0, charId: 'bulwark', seed: 42 });
+  PIT.step(stW, 1 / 60, { mx: 1, my: 0, ability: true });
+  check('BASTION activates on E (4s window)', stW.shield > 3.95);
+  stW.player.invuln = 0; stW.player.dashI = 0;
+  stW.proj.push({ x: stW.player.x + 20, y: stW.player.y, vx: -60, vy: 0, r: 3 });
+  let blocked = false;
+  for (let i = 0; i < 40 && !blocked; i++) {
+    PIT.step(stW, 1 / 60, { mx: 0, my: 0 });
+    blocked = stW.events.some(e => e.type === 'block'); stW.events.length = 0;
+  }
+  check('BASTION deletes a frontal shot', blocked && stW.player.hearts === 4 && stW.proj.length === 0);
+  const stW2 = PIT.createRun({ arenaIndex: 0, charId: 'bulwark', seed: 42 });
+  PIT.step(stW2, 1 / 60, { mx: 1, my: 0, ability: true });
+  stW2.player.invuln = 0; stW2.player.dashI = 0;
+  stW2.proj.push({ x: stW2.player.x - 20, y: stW2.player.y, vx: 60, vy: 0, r: 3 });
+  let blockedRear = false;
+  for (let i = 0; i < 40; i++) {
+    PIT.step(stW2, 1 / 60, { mx: 0, my: 0 });
+    blockedRear = blockedRear || stW2.events.some(e => e.type === 'block'); stW2.events.length = 0;
+  }
+  check('BASTION does not protect the back (rear shot lands)', !blockedRear && stW2.player.hearts === 3);
+  const stW3 = PIT.createRun({ arenaIndex: 0, charId: 'bulwark', seed: 42 });
+  PIT.step(stW3, 1 / 60, { mx: 1, my: 0, ability: true });
+  for (let i = 0; i < 250; i++) PIT.step(stW3, 1 / 60, { mx: 0, my: 0 });
+  check('BASTION expires after 4s', stW3.shield === 0);
+
+  check('ability ids intact: volt/overcharge, ghost/phase, bulwark/bastion',
+    CHARS.LIST.find(c => c.id === 'volt').ability === 'overcharge' &&
+    CHARS.LIST.find(c => c.id === 'ghost').ability === 'phase' &&
+    CHARS.LIST.find(c => c.id === 'bulwark').ability === 'bastion');
+}
+
 // ================= star + progression logic =================
 console.log('--- Stars & progression ---');
 check('3 stars = flawless', PIT.computeStars(0) === 3);
@@ -221,6 +312,24 @@ console.log('--- GHOST and BULWARK can win too ---');
   check('GHOST clears Arena II (seed 7)', g.st.over === 'win', String(g.st.over));
   const b = runFight(3, 'bulwark', 7, 300);
   check('BULWARK clears Arena IV (seed 7)', b.st.over === 'win', String(b.st.over));
+}
+console.log('--- Dashless casual reference (balance gate) ---');
+{
+  // AGENTS.md gates balance twice: the dodge-bot clears everything with dash, while the
+  // SAME brain without dash must clear the tutorial but stay walled off from the ladder.
+  // Measured exception (6/6): Arena IV HIVE MOTHER is kite-able without dash — spiral
+  // patterns leave walk-through gaps, that is a design fact, not a balance leak.
+  const a1 = [1, 2, 3, 4, 5, 6].map(s => runFight(0, 'volt', s, 300, { dashless: true }).st.over);
+  const a1wins = a1.filter(o => o === 'win').length;
+  check(`dashless reference clears Arena I on at least half the seeds (${a1wins}/6: ${a1.join(' ')})`, a1wins >= 3);
+  for (const [ai, label] of [[1, 'II'], [2, 'III'], [4, 'V']]) {
+    const outs = [1, 2, 3, 4, 5, 6].map(s => runFight(ai, 'volt', s, 300, { dashless: true }).st.over);
+    const wins = outs.filter(o => o === 'win').length;
+    check(`dashless reference cannot clear Arena ${label} (${wins}/6 wins: ${outs.join(' ')})`, wins === 0);
+  }
+  const a4 = [1, 2, 3, 4, 5, 6].map(s => runFight(3, 'volt', s, 300, { dashless: true }).st.over);
+  const a4wins = a4.filter(o => o === 'win').length;
+  console.log(`  INFO  dashless on Arena IV (HIVE MOTHER, kite-able by design): ${a4wins}/6 wins (${a4.join(' ')})`);
 }
 
 // ================= fairness probes from live sims =================
@@ -286,14 +395,18 @@ console.log('--- House guards ---');
   const APP = fs.readFileSync(__dirname + '/../app.js', 'utf8');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
+  const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
   check('app.js pins BUILD 2026.11.10', APP.includes("const BUILD = '2026.11.10'"));
-  check('app.js update log leads with BALANCE + UI PASS', APP.includes("tag: 'BALANCE + UI PASS'"));
+  check('app.js update log leads with ABILITY HOTFIX', APP.includes("tag: 'ABILITY HOTFIX'"));
+  check('app.js logs the BALANCE + UI PASS entry', APP.includes("tag: 'BALANCE + UI PASS'"));
   check('app.js logs the PIT OPEN BETA entry', APP.includes("tag: 'PIT OPEN BETA'"));
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
+  check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
   check('index.html footer stamps BUILD 2026.11.10 // CORE BREACH: PIT', IDX.includes('BUILD 2026.11.10 // CORE BREACH: PIT'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110d', busts.length === 7 && busts.every(t => t === '?v=20261110d'), busts.join(','));
+  check('all 7 asset tags bust at 20261110e', busts.length === 7 && busts.every(t => t === '?v=20261110e'), busts.join(','));
+  check('engine hurt() honors PHASE intangibility', ENG.includes('if (p.phase > 0) return false;'));
   check('styles.css forces [hidden] display:none !important (overlays respect hidden)', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(CSS));
   check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));
 }

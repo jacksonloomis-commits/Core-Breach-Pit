@@ -87,6 +87,7 @@
   function hurt(st, cause) {
     const p = st.player;
     if (st.over) return false;
+    if (p.phase > 0) return false; // PHASE ability: intangible — shots pass through, pools/beams/minions/boss cannot touch you
     if (p.invuln > 0 || p.dashI > 0) return false; // dash i-frames count
     p.hearts -= 1;
     st.hitsTaken += 1;

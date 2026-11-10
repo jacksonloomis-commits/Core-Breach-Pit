@@ -3,6 +3,11 @@
   'use strict';
   const BUILD = '2026.11.10';
   const UPDATE_LOG = [
+    { version: '2026.11.10', tag: 'ABILITY HOTFIX', items: [
+      'FIXED: GHOST PHASE was a coat of paint — the 2s intangibility timer existed but the damage code never read it, so shots, pools, beams, minions and the boss itself all still hit while phased. PHASE now truly walks through everything.',
+      'Full ability audit: OVERCHARGE (double fire rate) and BASTION (frontal shot barrier) verified live in the sim; new regression tests pin all three abilities',
+      'Balance gate made real: the dashless casual reference from AGENTS.md is now an enforced test — clears Arena I, walled off from Arenas II/III/V (HIVE MOTHER on IV is knowingly kite-able)'
+    ] },
     { version: '2026.11.10', tag: 'BALANCE + UI PASS', items: [
       'FIXED: dash invincibility never expired — one dash made you untouchable for the whole run. You can be hit now. Sorry.',
       'Boss pass: HP up across the ladder (160/230/280/440/520), fire rate down, pattern gaps halved, projectile speeds pushed toward the cap, denser volleys, tougher minions',
