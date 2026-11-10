@@ -41,6 +41,8 @@
 
   // ---------- run creation ----------
   // opts.boss is a bosses.js LIST index (ranked pools store indices) or a boss id.
+  // opts.mutators: explicit mutator ids (tests / fixed setups). opts.rankName: roll the
+  // ROUND VARIETY deck deterministically from the seed. Neither: no mutators (base).
   function createRun(opts) {
     const idx = typeof opts.boss === 'number' ? opts.boss : BOSSES.LIST.findIndex(b => b.id === opts.boss);
     const bossDef = BOSSES.LIST[idx];
@@ -50,14 +52,28 @@
 
     // ranked modifiers: higher ranks fight the same bosses with more HP and tighter
     // pacing. Telegraphs and projectile/charge speeds are NEVER scaled — the fairness
-    // law (tele >= 0.5s, speed caps) must hold at every rank.
+    // law (tele >= 0.5s, speed caps) must hold at every rank. ROUND VARIETY mutators
+    // compose multiplicatively on top of the rank presets.
     const mods = opts.mods || {};
-    const hpMult = clamp(typeof mods.hpMult === 'number' ? mods.hpMult : 1, 1, 3);
-    const gapMult = clamp(typeof mods.gapMult === 'number' ? mods.gapMult : 1, 0.5, 1);
+    const seed = (opts.seed != null ? opts.seed : (Date.now() ^ (Math.random() * 0xffffffff))) >>> 0;
+    let muts = [];
+    if (Array.isArray(opts.mutators)) {
+      const seen = new Set();
+      for (const id of opts.mutators) {
+        const m = MUTATORS.find(x => x.id === id);
+        if (m && !seen.has(m.id)) { muts.push(m); seen.add(m.id); }
+      }
+    } else if (opts.rankName) {
+      muts = rollMutators(opts.rankName, seed);
+    }
+    const mHp = muts.reduce((a, m) => a * (m.hp || 1), 1);
+    const mGap = muts.reduce((a, m) => a * (m.gap || 1), 1);
+    const hpMult = clamp((typeof mods.hpMult === 'number' ? mods.hpMult : 1) * mHp, 0.4, 3.5);
+    const gapMult = clamp((typeof mods.gapMult === 'number' ? mods.gapMult : 1) * mGap, 0.4, 1.5);
 
     const state = {
       t: 0,
-      seed: (opts.seed != null ? opts.seed : (Date.now() ^ (Math.random() * 0xffffffff))) >>> 0,
+      seed: seed,
       rng: null,
       bossIndex: idx,
       char: char,
@@ -78,7 +94,15 @@
         phase: 0, rt: { mode: 'gap', timer: 1.2 * gapMult, pat: null, patIdx: -1 },
         hitFlash: 0
       },
-      mods: { hpMult, gapMult },
+      mods: {
+        hpMult, gapMult,
+        projMult: muts.reduce((a, m) => a * (m.proj || 1), 1),
+        speedMult: muts.reduce((a, m) => a * (m.speed || 1), 1),
+        minionHp: muts.reduce((a, m) => a * (m.minionHp || 1), 1),
+        aggroShift: muts.reduce((a, m) => Math.max(a, m.aggroShift || 0), 0),
+        srMult: muts.reduce((a, m) => a * (m.srMult || 1), 1)
+      },
+      mutators: muts.map(m => ({ id: m.id, name: m.name, blurb: m.blurb })),
       proj: [], zones: [], beams: [], minions: [], tracers: [],
       shield: 0,
       hitsTaken: 0,
@@ -118,7 +142,8 @@
     b.rt.mode = 'tele';
     // PHASE FURY: telegraphs snap a beat tighter every phase, but never below the
     // 0.5s fairness floor — the law is data-side, this is the engine's escalation.
-    b.rt.timer = Math.max(0.5, pat.tele * aggroAt(b.phase).tele);
+    // VOLATILE CORE mutator sits the curve one phase deeper (st.mods.aggroShift).
+    b.rt.timer = Math.max(0.5, pat.tele * aggroAt(b.phase + (st.mods.aggroShift || 0)).tele);
     b.rt.sub = 0;      // generic sub-timer (volley gaps, spiral spawn acc)
     b.rt.spawned = 0;  // volleys / minions spawned
     b.rt.data = {};
@@ -164,7 +189,9 @@
   function spawnProj(st, x, y, ang, speed, kind) {
     const def = st.bossDef;
     const phase = def.phases[st.boss.phase];
-    const mult = aggroAt(st.boss.phase).speed * (phase.enrage ? 1.15 : 1);
+    // speed stack: AGGRO curve (+ VOLATILE shift) x enrage x HEATED AIR (projMult)
+    const mult = aggroAt(st.boss.phase + (st.mods.aggroShift || 0)).speed *
+      (phase.enrage ? 1.15 : 1) * (st.mods.projMult || 1);
     st.proj.push({ x, y, vx: Math.cos(ang) * speed * mult, vy: Math.sin(ang) * speed * mult, r: 3, kind: kind || 'shot' });
   }
 
@@ -239,7 +266,9 @@
           st.minions.push({
             x: clamp(b.x + Math.cos(a) * 26, AR.x0 + 4, AR.x1 - 4),
             y: clamp(b.y + Math.sin(a) * 26, AR.y0 + 4, AR.y1 - 4),
-            r: 3, hp: 14, hitFlash: 0
+            // BROOD BLIGHT mutator hatches the brood sickly (x0.6 HP); spawn COUNTS and
+            // CAPS are never touched by mutators (the summon-cadence law)
+            r: 3, hp: Math.round(14 * (st.mods.minionHp || 1)), hitFlash: 0
           });
         }
         st.events.push({ type: 'spawn' });
@@ -290,7 +319,7 @@
     if (input && input.ability && p.abCd <= 0) useAbility(st);
     p.abCd = Math.max(0, (p.abCd || 0) - dt);
 
-    const speed = p.dashT > 0 ? 1 : ch.speed;
+    const speed = p.dashT > 0 ? 1 : ch.speed * (st.mods.speedMult || 1); // ADRENALINE multiplies run speed (dash untouched)
     if (p.dashT > 0) {
       p.dashT -= dt;
       p.x = clamp(p.x + p.dvx * dt, AR.x0 + p.r, AR.x1 - p.r);
@@ -371,12 +400,12 @@
       if (pat.type === 'charge') execPattern(st, dt); // charge moves boss during active
       if (rt.timer <= 0) {
         rt.mode = 'recover';
-        rt.timer = (typeof ph.recover === 'number' ? ph.recover : 0.25) * aggroAt(b.phase).gap;
+        rt.timer = (typeof ph.recover === 'number' ? ph.recover : 0.25) * aggroAt(b.phase + (st.mods.aggroShift || 0)).gap;
         st.beams.length = 0;
       }
     } else if (rt.mode === 'recover' && rt.timer <= 0) {
       rt.mode = 'gap';
-      rt.timer = ph.gap * st.mods.gapMult * (ph.enrage ? 0.78 : 1) * aggroAt(b.phase).gap;
+      rt.timer = ph.gap * st.mods.gapMult * (ph.enrage ? 0.78 : 1) * aggroAt(b.phase + (st.mods.aggroShift || 0)).gap;
     }
 
     // --- projectiles
@@ -444,9 +473,46 @@
     else if (ch.ability === 'bastion') { st.shield = 4; st.events.push({ type: 'ability', id: 'bastion' }); }
   }
 
+  // ---------- ROUND VARIETY (owner spec: "make each round sorta unique ... less tedious") ----------
+  // Every queue can draw mutators — house twists the Pit rolls with the boss. The deck
+  // is engine-side data; effects compose multiplicatively with the rank presets (see
+  // createRun). The draw is deterministic per fight seed, so one attempt always fights
+  // the same twist. Draw counts: bronze mostly stays clean (55% for one), silver always
+  // one, gold/platinum usually two, diamond and above always two. Spawner-flavored
+  // mutators (needsSpawn) only join the deck if the rank's pool owns a boss with spawn
+  // patterns. MUTATORS NEVER TOUCH SPAWN COUNTS OR CAPS (summon-cadence law).
+  const MUTATORS = [
+    { id: 'frail', name: 'FRAIL', blurb: 'Brittle lieutenant — boss HP ×0.72.', hp: 0.72 },
+    { id: 'swift', name: 'SWIFT HORROR', blurb: 'It cycles patterns faster, but its shell thins — GAP ×0.85, HP ×0.92.', gap: 0.85, hp: 0.92 },
+    { id: 'siege', name: 'SIEGE', blurb: 'A wall of HP, but it takes its time — HP ×1.25, GAP ×1.12.', hp: 1.25, gap: 1.12 },
+    { id: 'heated', name: 'HEATED AIR', blurb: 'Every projectile flies hotter — SPEED ×1.10, GAP ×1.08.', proj: 1.10, gap: 1.08 },
+    { id: 'blight', name: 'BROOD BLIGHT', blurb: 'The brood hatches sickly — minion HP ×0.6. Spawner arenas only.', minionHp: 0.6, needsSpawn: true },
+    { id: 'volatile', name: 'VOLATILE CORE', blurb: 'It runs hot from the first phase — the fury curve sits one phase deeper.', aggroShift: 1 },
+    { id: 'adrenaline', name: 'ADRENALINE', blurb: 'Adrenal spike — you run ×1.12 faster.', speed: 1.12 },
+    { id: 'bounty', name: 'BOUNTY', blurb: 'The Tide pays extra — SR payout ×1.3, win or lose.', srMult: 1.3 }
+  ];
+
+  function rollMutators(rankName, seed) {
+    const rank = RANKS.find(r => r.name === rankName) || RANKS[0];
+    const hasSpawner = rank.pool.some(i => BOSSES.LIST[i].phases.some(ph => ph.patterns.some(p => p.type === 'spawn')));
+    const deck = MUTATORS.filter(m => !m.needsSpawn || hasSpawner);
+    const rng = mulberry32((seed ^ 0x51ab3f7) >>> 0);
+    const want = rank.name === 'BRONZE' ? (rng() < 0.55 ? 1 : 0)
+      : rank.name === 'SILVER' ? 1
+      : (rank.name === 'GOLD' || rank.name === 'PLATINUM') ? (rng() < 0.65 ? 2 : 1)
+      : 2;
+    const picked = [];
+    for (let tries = 0; picked.length < want && tries < 64; tries++) {
+      const m = deck[Math.floor(rng() * deck.length)];
+      if (!picked.includes(m)) picked.push(m);
+    }
+    return picked;
+  }
+
   // ---------- ranked ladder (RANKED BETA) ----------
   // SR economy (owner spec): wins bank SR by hearts kept; a flatline costs SR.
-  // SR never resets — seasons only award cosmetics on top.
+  // SR never resets — seasons only award cosmetics on top. The BOUNTY mutator
+  // multiplies the payout (srMult, default 1) on wins AND losses — risk and reward.
   const SR = { WIN_FULL: 30, WIN_ONE: 15, WIN_TWO: -5, WIN_THREE_PLUS: -20, LOSS: -10 };
   function srDelta(win, heartsLost) {
     if (!win) return SR.LOSS;
@@ -470,18 +536,20 @@
     IRIDESCENT: { hpMult: 2.0, gapMult: 0.7 }
   };
 
-  // Boss pools (owner spec, ARENA POOLS + PHASE FURY): indices into bosses.js LIST.
-  // "Each arena should have its own boss pool" — every rank owns an EXCLUSIVE pool;
-  // no boss rolls in two arenas. PHASE FURY deepened the five two-boss pools to three:
+  // Boss pools (owner spec, ARENA POOLS + PHASE FURY + ROUND VARIETY): indices into
+  // bosses.js LIST. "Each arena should have its own boss pool" — every rank owns an
+  // EXCLUSIVE pool; no boss rolls in two arenas. The five beyond/gold pools now roll
+  // FOUR bodies each (ROUND VARIETY 2026.11.14, owner spec: "add a few more bosses
+  // anyways"):
   //   BRONZE     [0-4]     the bronze band, unchanged ("super ez" by design)
   //   SILVER     [5-10]    THE DEATHWARRANT AREA, champion weight
-  //   GOLD       [11-13]   the tax collectors — BRASS HERALD, THE AUDITOR, TOLLMASTER
-  //   PLATINUM   [14-16]   gravewake + cindermaw + ironchoir (first gate past the champion)
-  //   DIAMOND    [17-19]   theloom + dredgewarden + fathom
-  //   CRIMSON    [20-22]   maelstrom + goreprelate + nullsovereign
-  //   IRIDESCENT [23-25]   theglutton + oldwater + tideunbound (the Tide itself)
+  //   GOLD       [11-14]   the tax collectors — BRASS HERALD, THE AUDITOR, TOLLMASTER, THE LEDGER
+  //   PLATINUM   [15-18]   gravewake + cindermaw + HOLLOW REGENT + ironchoir (first gate past the champion)
+  //   DIAMOND    [19-22]   theloom + dredgewarden + fathom + PRESSURE SAINT
+  //   CRIMSON    [23-26]   maelstrom + goreprelate + nullsovereign + THE MARSHAL
+  //   IRIDESCENT [27-30]   theglutton + PALE LEVIATHAN + oldwater + tideunbound (the Tide itself)
   // A suite test pins OWNERSHIP: the seven pools are pairwise disjoint and their
-  // union is the entire 26-boss roster, pool max base HP escalating arena by arena.
+  // union is the entire 31-boss roster, pool max base HP escalating arena by arena.
   // Bot gates: every boss is proven at its rank preset where VOLT can live there
   // (bronze/silver/gold 3/3) and at base for the beyond band (BULWARK 3/3).
   // PLATINUM+ presets remain the designed beyond-bot wall — humans outplay the bot
@@ -497,18 +565,18 @@
     { name: 'SILVER', tier: 1, min: 500, max: 600, pool: [5, 6, 7, 8, 9, 10] },
     { name: 'SILVER', tier: 2, min: 600, max: 700, pool: [5, 6, 7, 8, 9, 10] },
     { name: 'SILVER', tier: 3, min: 700, max: 800, pool: [5, 6, 7, 8, 9, 10] },
-    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [11, 12, 13] },
-    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [11, 12, 13] },
-    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [14, 15, 16] },
-    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [14, 15, 16] },
-    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [14, 15, 16] },
-    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [17, 18, 19] },
-    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [17, 18, 19] },
-    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [17, 18, 19] },
-    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [20, 21, 22] },
-    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [20, 21, 22] },
-    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [20, 21, 22] },
-    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [23, 24, 25] }
+    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [11, 12, 13, 14] },
+    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [11, 12, 13, 14] },
+    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [15, 16, 17, 18] },
+    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [15, 16, 17, 18] },
+    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [15, 16, 17, 18] },
+    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [19, 20, 21, 22] },
+    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [19, 20, 21, 22] },
+    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [19, 20, 21, 22] },
+    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [23, 24, 25, 26] },
+    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [23, 24, 25, 26] },
+    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [23, 24, 25, 26] },
+    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [27, 28, 29, 30] }
   ];
 
   function rankFor(sr) {
@@ -526,8 +594,9 @@
   // operatives unlock by SR now (were arena clears)
   const CHAR_UNLOCK_SR = { ghost: 500, bulwark: 1100 };
 
-  function applyRankedResult(save, win, heartsLost) {
-    const res = { delta: srDelta(win, heartsLost), newChars: [], promoted: null, demoted: null };
+  function applyRankedResult(save, win, heartsLost, srMult) {
+    const delta = Math.round(srDelta(win, heartsLost) * (typeof srMult === 'number' ? srMult : 1));
+    const res = { delta, newChars: [], promoted: null, demoted: null };
     const before = rankFor(save.sr);
     save.sr = Math.max(0, save.sr + res.delta);
     save.peakSr = Math.max(save.peakSr || 0, save.sr);
@@ -599,7 +668,7 @@
 
   return {
     W, H, HUD, AR, CHARS, BOSSES, createRun, step, hurt, mulberry32, segDist, clamp, dist,
-    AGGRO, aggroAt,
+    AGGRO, aggroAt, MUTATORS, rollMutators,
     SR, srDelta, RANKS, RANK_MODS, rankFor, rankLabel, rankMods, tierProgress,
     CHAR_UNLOCK_SR, applyRankedResult, TOP5_QUALIFY, TOP5_MOCK, leaderboardWith,
     SEASON, defaultRankedSave, seasonEnd, migrateSave

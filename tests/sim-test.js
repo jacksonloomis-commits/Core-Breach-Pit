@@ -116,9 +116,10 @@ function botInput(st) {
 }
 
 // ---------- sim harness ----------
-// opts: { dashless, mods } — mods default to none (base preset)
+// opts: { dashless, mods, mutators, rankName } — mods default to none (base preset);
+// mutators/rankName pass straight into createRun (explicit ids, or a rank-deck roll)
 function runFight(boss, charId, seed, capSec, opts = {}) {
-  const st = PIT.createRun({ boss, charId, seed, mods: opts.mods });
+  const st = PIT.createRun({ boss, charId, seed, mods: opts.mods, mutators: opts.mutators, rankName: opts.rankName });
   const dt = 1 / 60;
   let steps = Math.round(capSec / dt);
   while (steps-- > 0 && !st.over) {
@@ -131,12 +132,12 @@ function runFight(boss, charId, seed, capSec, opts = {}) {
 }
 
 // ================= data integrity =================
-console.log('--- Data integrity (ARENA POOLS + PHASE FURY) ---');
-check('26 bosses defined', BOSSES.LIST.length === 26, String(BOSSES.LIST.length));
-check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 26);
-check('bands: 5 bronze / 6 silver / 3 gold / 12 beyond',
+console.log('--- Data integrity (ARENA POOLS + PHASE FURY + ROUND VARIETY) ---');
+check('31 bosses defined', BOSSES.LIST.length === 31, String(BOSSES.LIST.length));
+check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 31);
+check('bands: 5 bronze / 6 silver / 4 gold / 16 beyond',
   bandBosses('bronze').length === 5 && bandBosses('silver').length === 6 &&
-  bandBosses('gold').length === 3 && bandBosses('beyond').length === 12,
+  bandBosses('gold').length === 4 && bandBosses('beyond').length === 16,
   `${bandBosses('bronze').length}/${bandBosses('silver').length}/${bandBosses('gold').length}/${bandBosses('beyond').length}`);
 check('every boss carries title, brief and tint', BOSSES.LIST.every(b => b.title && b.brief && b.tint && b.band));
 
@@ -170,8 +171,8 @@ check(`beyond band is past the champion (HP ${Math.min(...beyondHP)}..${Math.max
   check(`the ladder has 7 arenas, each owning a pool of >= 3 bosses (${names.join('/')})`,
     names.length === 7 && pools.every(x => x.p.length >= 3), pools.map(x => `${x.n}:${x.p.length}`).join(' '));
   check('no boss rolls in two arenas (pools pairwise disjoint)', disjoint);
-  check('the pools cover the whole roster (all 26 bosses reachable somewhere)',
-    new Set(union).size === 26 && union.length === 26, `union ${new Set(union).size}/26`);
+  check('the pools cover the whole roster (all 31 bosses reachable somewhere)',
+    new Set(union).size === 31 && union.length === 31, `union ${new Set(union).size}/31`);
   const bandOf = { BRONZE: 'bronze', SILVER: 'silver', GOLD: 'gold' };
   check('bronze/silver/gold arenas roll only their own band',
     pools.filter(x => bandOf[x.n]).every(x => x.p.every(i => BOSSES.LIST[i].band === bandOf[x.n])));
@@ -320,6 +321,107 @@ console.log('--- Phase fury: the engine escalates every phase ---');
   // the ring is always walkable, at every rank, in every phase: no multipliers on its speed
   check('burst ring speed never reaches run speed (46 + 4/phase < 68)',
     [0, 1, 2, 3].every(i => 46 + 4 * i < CHARS.LIST[0].speed));
+}
+
+// ================= round variety (owner spec: every round its own puzzle) =================
+console.log('--- Round variety: mutators ---');
+{
+  check('8 mutators in the deck, unique ids and names, every one carries a blurb',
+    PIT.MUTATORS.length === 8 && new Set(PIT.MUTATORS.map(m => m.id)).size === 8 &&
+    new Set(PIT.MUTATORS.map(m => m.name)).size === 8 && PIT.MUTATORS.every(m => m.id && m.name && m.blurb));
+  check('mutator ids: frail/swift/siege/heated/blight/volatile/adrenaline/bounty',
+    ['frail', 'swift', 'siege', 'heated', 'blight', 'volatile', 'adrenaline', 'bounty']
+      .every(id => PIT.MUTATORS.some(m => m.id === id)));
+  // determinism + draw-shape rules
+  const roll = (rank, seed) => PIT.rollMutators(rank, seed).map(m => m.id);
+  check('rollMutators is deterministic (same rank + seed -> same draw)',
+    JSON.stringify(roll('GOLD', 42)) === JSON.stringify(roll('GOLD', 42)));
+  const goldCounts = [];
+  let dupFree = true;
+  for (let s = 0; s < 40; s++) {
+    const ids = roll('GOLD', 100 + s);
+    if (new Set(ids).size !== ids.length) dupFree = false;
+    goldCounts.push(ids.length);
+  }
+  check('GOLD draws 1-2 mutators (mostly 2), never the same one twice',
+    dupFree && goldCounts.every(n => n >= 1 && n <= 2) && goldCounts.filter(n => n === 2).length >= 10,
+    goldCounts.join(','));
+  const bronzeCounts = [];
+  let bronzeClean = 0;
+  for (let s = 0; s < 60; s++) { const n = roll('BRONZE', 200 + s).length; bronzeCounts.push(n); if (n === 0) bronzeClean++; }
+  check(`BRONZE mostly stays clean (${bronzeClean}/60 seeds draw nothing, never more than 1)`,
+    bronzeCounts.every(n => n <= 1) && bronzeClean >= 5);
+  check('IRIDESCENT always draws 2', Array.from({ length: 20 }, (_, s) => roll('IRIDESCENT', 300 + s).length).every(n => n === 2));
+  check('SILVER always draws exactly 1', Array.from({ length: 20 }, (_, s) => roll('SILVER', 400 + s).length).every(n => n === 1));
+  // BROOD BLIGHT is a spawner-only mutator: gold has no summoner, silver does (HIVE MOTHER)
+  const goldHasBlight = Array.from({ length: 40 }, (_, s) => roll('GOLD', 500 + s)).some(ids => ids.includes('blight'));
+  const silverHasBlight = Array.from({ length: 40 }, (_, s) => roll('SILVER', 600 + s)).some(ids => ids.includes('blight'));
+  check('BROOD BLIGHT never rolls in GOLD (no summoner in the pool), rolls in SILVER (HIVE MOTHER does)',
+    !goldHasBlight && silverHasBlight);
+  // effect pins — createRun with explicit mutator ids
+  const withMuts = (boss, charId, muts, mods) => PIT.createRun({ boss, charId, seed: 42, mods, mutators: muts });
+  const frail = withMuts(0, 'volt', ['frail'], PIT.RANK_MODS.BRONZE);
+  check('FRAIL: boss HP ×0.72 (160 -> 115)', frail.boss.hp === Math.round(160 * 0.72));
+  const siege = withMuts(0, 'volt', ['siege'], PIT.RANK_MODS.BRONZE);
+  check('SIEGE: HP ×1.25 (160 -> 200) and GAP ×1.12 composes with the rank preset',
+    siege.boss.hp === 200 && Math.abs(siege.mods.gapMult - 1.12) < 0.001);
+  const doubled = withMuts(0, 'volt', ['siege', 'heated'], PIT.RANK_MODS.BRONZE);
+  check('two mutators compose multiplicatively (SIEGE+HEATED GAP 1.12×1.08, HP 1.25)',
+    Math.abs(doubled.mods.gapMult - 1.12 * 1.08) < 0.001 && doubled.mutators.length === 2);
+  const deduped = withMuts(0, 'volt', ['siege', 'siege'], PIT.RANK_MODS.BRONZE);
+  check('a repeated mutator id is applied once, not stacked', deduped.mutators.length === 1 && deduped.boss.hp === 200);
+  // HEATED AIR / VOLATILE CORE: drive the pattern runtime like the fury pins —
+  // the same ring cast at phase 0 must leave at mutator-adjusted speed
+  function ringShotSpeedMuts(muts) {
+    const st = withMuts('paleherald', 'volt', muts, null);
+    const pat = st.bossDef.phases[0].patterns.find(p => p.type === 'ring');
+    st.boss.rt = { mode: 'tele', timer: 0.001, pat, patIdx: 0, data: {}, spawned: 0, sub: 0 };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    return Math.hypot(st.proj[0].vx, st.proj[0].vy);
+  }
+  const baseSpd = ringShotSpeedMuts([]), heatedSpd = ringShotSpeedMuts(['heated']), volatileSpd = ringShotSpeedMuts(['volatile']);
+  check(`HEATED AIR: the same ring leaves 10% faster (${baseSpd.toFixed(1)} -> ${heatedSpd.toFixed(1)})`,
+    Math.abs(heatedSpd - baseSpd * 1.10) < 0.01);
+  check(`VOLATILE CORE: the fury curve starts one phase deeper (${volatileSpd.toFixed(1)} = phase-1 speed)`,
+    Math.abs(volatileSpd - baseSpd * PIT.AGGRO.speed[1]) < 0.01);
+  // BROOD BLIGHT: the brood hatches sickly — cadence, counts and caps untouched
+  {
+    const st = withMuts('hive', 'volt', ['blight'], null);
+    st.boss.phase = 0;
+    const pat = st.bossDef.phases[0].patterns.find(p => p.type === 'spawn');
+    st.boss.rt = { mode: 'tele', timer: 0.001, pat, patIdx: 0, data: {}, spawned: 0, sub: 0 };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    check(`BROOD BLIGHT: ${st.minions.length} brood hatch at 14 × 0.6 = 8 HP (count and cap untouched)`,
+      st.minions.length === pat.count && st.minions.every(m => m.hp === Math.round(14 * 0.6)));
+  }
+  // ADRENALINE: the operative covers ground ×1.12 (dash untouched)
+  {
+    const base = withMuts(0, 'volt', [], null); const fast = withMuts(0, 'volt', ['adrenaline'], null);
+    for (let i = 0; i < 10; i++) { PIT.step(base, 1 / 60, { mx: 1, my: 0 }); PIT.step(fast, 1 / 60, { mx: 1, my: 0 }); }
+    const bDx = base.player.x - (PIT.AR.x0 + PIT.AR.x1) / 2, fDx = fast.player.x - (PIT.AR.x0 + PIT.AR.x1) / 2;
+    check(`ADRENALINE: run speed ×1.12 (${bDx.toFixed(2)} -> ${fDx.toFixed(2)} px)`, Math.abs(fDx - bDx * 1.12) < 0.001);
+  }
+  // BOUNTY: the payout multiplies both ways (risk and reward in one tag)
+  {
+    const s1 = PIT.defaultRankedSave();
+    const r1 = PIT.applyRankedResult(s1, true, 0, 1.3);
+    check('BOUNTY: clean win pays 30 × 1.3 = 39 SR', r1.delta === 39 && s1.sr === 39);
+    const s2 = PIT.defaultRankedSave();
+    const r2 = PIT.applyRankedResult(s2, false, 4, 1.3);
+    check('BOUNTY: a flatline costs more too (−10 × 1.3 = −13)', r2.delta === -13);
+    const s3 = PIT.defaultRankedSave();
+    check('no mutators: payout unchanged (+30)', PIT.applyRankedResult(s3, true, 0).delta === 30);
+  }
+  // every mutator keeps the tutorial endable and easy: GATEKEEPER 3/3 at BRONZE preset
+  for (const m of PIT.MUTATORS) {
+    let wins = 0; const det = [];
+    for (const seed of [1, 2, 3]) {
+      const { st, time } = runFight(0, 'volt', seed, 300, { mods: PIT.RANK_MODS.BRONZE, mutators: [m.id] });
+      det.push(`${seed}:${st.over}@${Math.round(time)}s`);
+      if (st.over === 'win') wins++;
+    }
+    check(`GATEKEEPER + ${m.name} cleared 3/3 at BRONZE (${det.join(' ')})`, wins === 3);
+  }
 }
 
 // ================= rules =================
@@ -569,7 +671,7 @@ console.log('--- Dodge-bot: gold band at the GOLD preset (VOLT) — the tax coll
     check(`${b.name} cleared 3/3 at GOLD preset (${details.join(' ')})`, wins === 3);
   }
 }
-console.log('--- Dodge-bot: beyond band at base (BULWARK, the siege frame) — 12 bosses, one exclusive trio per rank ---');
+console.log('--- Dodge-bot: beyond band at base (BULWARK, the siege frame) — 16 bosses, one exclusive quartet per rank ---');
 {
   for (const { b, i } of bandBosses('beyond')) {
     let wins = 0;
@@ -696,7 +798,9 @@ console.log('--- Fuzz ---');
       }
     }
   } catch (e) { crashed = true; }
-  check('random-input fuzz across all 26 bosses: no crash', !crashed);
+  // ROUND VARIETY effect pins are in the mutators section below; this fuzz covers the
+  // whole roster including the five ROUND VARIETY additions.
+  check('random-input fuzz across all 31 bosses: no crash', !crashed);
 }
 
 // ================= house guards =================
@@ -707,8 +811,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.13', APP.includes("const BUILD = '2026.11.13'"));
-  check('app.js update log leads with BROOD TAX', APP.includes("tag: 'BROOD TAX'") && APP.indexOf("tag: 'BROOD TAX'") < APP.indexOf("tag: 'PHASE FURY'"));
+  check('app.js pins BUILD 2026.11.14', APP.includes("const BUILD = '2026.11.14'"));
+  check('app.js update log leads with ROUND VARIETY', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
+  check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
   check('app.js logs the PHASE FURY entry', APP.includes("tag: 'PHASE FURY'"));
   check('app.js logs the ARENA POOLS entry', APP.includes("tag: 'ARENA POOLS'"));
   check('app.js logs the BOSS EXPANSION entry', APP.includes("tag: 'BOSS EXPANSION'"));
@@ -719,9 +824,9 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.13 // BROOD TAX', IDX.includes('BUILD 2026.11.13 // CORE BREACH: PIT — BROOD TAX'));
+  check('index.html footer stamps BUILD 2026.11.14 // ROUND VARIETY', IDX.includes('BUILD 2026.11.14 // CORE BREACH: PIT — ROUND VARIETY'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110i', busts.length === 7 && busts.every(t => t === '?v=20261110i'), busts.join(','));
+  check('all 7 asset tags bust at 20261110j', busts.length === 7 && busts.every(t => t === '?v=20261110j'), busts.join(','));
   {
     // BROOD TAX data pin: the summon cadence law for the reported boss — the brood phase
     // keeps spawn at most 1-of-3 patterns with the swarm capped at 4.
@@ -733,14 +838,21 @@ console.log('--- House guards ---');
   }
   check('engine hurt() honors PHASE intangibility', ENG.includes('if (p.phase > 0) return false;'));
   check('engine carries the PHASE FURY aggression curve and burst ring', ENG.includes('const AGGRO') && ENG.includes("kind: 'phase'") && ENG.includes('aggroAt('));
+  check('engine carries the ROUND VARIETY mutator deck and the summon-cadence guard',
+    ENG.includes('const MUTATORS') && ENG.includes('MUTATORS NEVER TOUCH SPAWN COUNTS OR CAPS') && ENG.includes('function rollMutators'));
+  check('app.js renders the mutator draw in the fight title and results',
+    APP.includes('rankName: rk.name') && APP.includes("'MUTATORS: '"));
+  check('startFight re-hides the result and pause overlays (no stale overlays over a fresh fight)',
+    APP.includes("$('#result').hidden = true;") && APP.includes("$('#pause-ov').hidden = true;"));
   check('engine has no arena-progression references left', !ENG.includes('ARENAS'));
   check('styles.css forces [hidden] display:none !important (overlays respect hidden)', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(CSS));
   check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));
   check('hub renders the ranked card, ladder, Top 5 and arena roster', IDX.includes('id="rank-card"') && IDX.includes('id="rank-ladder"') && IDX.includes('id="top5"') && IDX.includes('id="roster"'));
   check('app.js draws every boss in the roster',
     ['gatekeeper', 'bilespitter', 'gnasher', 'cindermite', 'thresher', 'surgeon', 'hive', 'paleherald', 'gloamwarden', 'carrionlaw',
-     'brassherald', 'theauditor', 'tollmaster', 'gravewake', 'cindermaw', 'ironchoir', 'theloom', 'dredgewarden', 'fathom', 'maelstrom',
-     'goreprelate', 'nullsovereign', 'theglutton', 'oldwater', 'tideunbound']
+     'brassherald', 'theauditor', 'tollmaster', 'ledger', 'gravewake', 'cindermaw', 'hollowregent', 'ironchoir', 'theloom', 'dredgewarden',
+     'fathom', 'pressuresaint', 'maelstrom', 'goreprelate', 'nullsovereign', 'marshal', 'theglutton', 'paleleviathan', 'oldwater',
+     'tideunbound']
       .every(id => APP.includes(`case '${id}'`)));
 }
 

@@ -1,8 +1,15 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.13';
+  const BUILD = '2026.11.14';
   const UPDATE_LOG = [
+    { version: '2026.11.14', tag: 'ROUND VARIETY', items: [
+      'MUTATORS (owner spec: make each round sorta unique and a little less tedious): every queue can now draw house twists alongside the boss — FRAIL, SWIFT HORROR, SIEGE, HEATED AIR, BROOD BLIGHT, VOLATILE CORE, ADRENALINE and BOUNTY. The fight title and the results screen tell you exactly what the Pit rolled',
+      'THE DEEPER YOU CLIMB, THE WEIRDER IT GETS: bronze mostly rolls clean (55% for one twist), silver always rolls one, gold and platinum usually roll two, diamond and above always roll two. Every draw is seeded per attempt, so no two queues play the same fight',
+      'BROOD BLIGHT only rolls in arenas whose pool owns a summoner, and mutators never touch spawn counts or swarm caps — the summon-cadence law stands and a spawn stall stays impossible',
+      'BOUNTY multiplies the SR payout ×1.3 — banked on wins and losses alike, so it is risk and reward in one tag',
+      'THE ROSTER GOES 26 -> 31 (owner spec: add a few more bosses anyways): one new body per pool where repetition bites — THE LEDGER (gold), HOLLOW REGENT (platinum), PRESSURE SAINT (diamond), THE MARSHAL (crimson) and PALE LEVIATHAN (iridescent, 4 phases). Every arena now rolls FOUR lieutenants, all bot-proven 3/3 at their gates'
+    ] },
     { version: '2026.11.13', tag: 'BROOD TAX', items: [
       'FIXED (owner report): GRAVEWAKE was just about unbeatable — its brood phase summoned every 2nd pattern, which is exactly the rate a player can kill minions, so the swarm never emptied, your gun was stuck on blob cleanup and the boss barely took damage. Measured by probe: a 244-second brood phase, 70 spawn events, 140 minion kills, fight unwinnable',
       'THE BROOD IS TAXED: the REGURGITANT now summons 1-of-3 patterns with the swarm capped at 4 (was every-2nd, cap 5). The brood still hunts you and stragglers chase into later phases — it can just be outkilled now. Measured: brood phase 244s -> 59s, PLATINUM-preset fight BULWARK 5/6 clears at ~129s',
@@ -208,11 +215,17 @@
 
   function startFight(bossIndex, rk) {
     rk = rk || PIT.rankFor(SAVE.sr);
-    st = PIT.createRun({ boss: bossIndex, charId: SAVE.char, seed: (Date.now() & 0xffffff) >>> 0, mods: PIT.rankMods(rk) });
+    // ROUND VARIETY: the rank name tells the engine to roll the mutator deck with the
+    // fight seed — every attempt fights its own boss AND its own house twists
+    st = PIT.createRun({ boss: bossIndex, charId: SAVE.char, seed: (Date.now() & 0xffffff) >>> 0, mods: PIT.rankMods(rk), rankName: rk.name });
     particles = []; acc = 0; overT = 0; paused = false; flashT = 0;
+    // overlay hygiene: a fresh fight must never open under a stale PAUSED/RESULTS overlay
+    $('#result').hidden = true;
+    $('#pause-ov').hidden = true;
     SAVE.runs++; persist();
     show('fight');
-    $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${st.mods.hpMult} GAP ×${st.mods.gapMult}`;
+    const mutTag = st.mutators.length ? ' — ' + st.mutators.map(m => m.name).join(' · ') : '';
+    $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${st.mods.hpMult} GAP ×${st.mods.gapMult}${mutTag}`;
     running = true; last = performance.now();
     requestAnimationFrame(loop);
   }
@@ -221,7 +234,7 @@
     running = false;
     const win = st.over === 'win';
     const heartsLost = st.player.maxHearts - Math.max(0, st.player.hearts);
-    const res = PIT.applyRankedResult(SAVE, win, heartsLost);
+    const res = PIT.applyRankedResult(SAVE, win, heartsLost, st.mods.srMult || 1);
     persist();
     showResult(win, res, heartsLost);
   }
@@ -239,6 +252,9 @@
       box.appendChild(el('p', 'result-sub', `${label} · boss HP was ${Math.round(100 * st.boss.hp / st.boss.maxHp)}% of a ${st.bossDef.name} at ${PIT.rankLabel(PIT.rankFor(SAVE.sr))} pacing`));
     } else {
       box.appendChild(el('p', 'result-sub', `The Tide keeps the SR. Boss HP was ${Math.max(0, Math.round(100 * st.boss.hp / st.boss.maxHp))}% left.`));
+    }
+    if (st.mutators.length) {
+      box.appendChild(el('p', 'result-sub', 'MUTATORS: ' + st.mutators.map(m => m.name).join(' · ')));
     }
     if (res.promoted) { const b = el('div', 'banner gold', `PROMOTED — ${PIT.rankLabel(res.promoted)}`); box.appendChild(b); }
     if (res.demoted) { const b = el('div', 'banner crimson', `DEMOTED — ${PIT.rankLabel(res.demoted)}`); box.appendChild(b); }
@@ -553,6 +569,31 @@
         px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
         px(x - r + 2, y - 2, r * 2 - 4, 6, flash ? C.white : C.void); // the maw
         px(x - r + 3, y - 1, 2, 3, C.gold); px(x - 1, y - 1, 2, 3, C.gold); px(x + r - 5, y - 1, 2, 3, C.gold); break; // teeth
+      case 'ledger':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 2, y - 3, r * 2 - 4, 2, dark); px(x - r + 2, y + 1, r * 2 - 4, 2, dark); // ledger lines
+        px(x - 1, y - r - 4, 2, 5, flash ? C.white : C.gold); // quill spike
+        px(x - 2, y - 1, 4, 3, flash ? C.white : C.void); break; // seal eye
+      case 'hollowregent':
+        px(x - r + 2, y - r + 2, r * 2 - 4, r * 2 - 2, tint); // the hollow frame
+        px(x - r + 2, y - r - 3, 3, 4, C.gold); px(x + r - 5, y - r - 3, 3, 4, C.gold); px(x - 2, y - r - 4, 4, 5, C.gold); // broken crown
+        px(x - 4, y - 2, 8, 5, flash ? C.white : C.void); // the hollow
+        px(x - 2, y - 1, 2, 2, C.crimson); px(x + 1, y - 1, 2, 2, C.crimson); break; // pinprick eyes
+      case 'pressuresaint':
+        px(x - r + 3, y - r + 2, r * 2 - 6, r * 2 - 2, tint);
+        px(x - 3, y - r - 3, 6, 2, flash ? C.white : C.gold); // the halo
+        px(x - r + 3, y - 2, r * 2 - 6, 3, dark);
+        px(x - 2, y - 3, 4, 3, flash ? C.white : C.void); px(x - 1, y + 1, 2, 2, C.tealite); break; // praying eye + spark
+      case 'marshal':
+        px(x - r + 1, y - r + 2, r * 2 - 2, r * 2 - 2, tint);
+        px(x - r - 2, y - r + 1, 4, 5, dark); px(x + r - 2, y - r + 1, 4, 5, dark); // pauldrons
+        px(x + r - 1, y - 1, 6, 2, flash ? C.white : C.gray); // the axe shaft
+        px(x - 3, y - 2, 6, 3, flash ? C.white : C.void); px(x - 2, y - 1, 2, 2, C.crimson); break; // visor
+      case 'paleleviathan':
+        px(x - r, y - r + 3, r * 2, r * 2 - 4, tint);
+        px(x - r - 2, y - 3, 4, 5, flash ? C.white : C.tealite); px(x + r - 2, y - 3, 4, 5, flash ? C.white : C.tealite); // fins
+        px(x - r + 2, y - r, r * 2 - 4, 3, flash ? C.white : C.white); // the pale spine
+        px(x - 4, y, 8, 3, flash ? C.white : C.void); px(x - 2, y - 4, 2, 2, C.crimson); px(x + 1, y - 4, 2, 2, C.crimson); break; // the drowned maw
       case 'oldwater':
         px(x - r, y - r + 1, r * 2, r * 2 - 2, tint);
         px(x - r, y - r - 2, r * 2, 3, flash ? C.white : C.white); // the pale crest

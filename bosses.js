@@ -27,6 +27,14 @@
 // GORE PRELATE (655) the crimson court, OLD WATER (700, 4 phases) the iridescent
 // endgame. Engine-side, every phase now escalates the WHOLE fight (see AGGRO in
 // engine.js) and every transition fires a gold retaliation ring.
+// ROUND VARIETY 2026.11.14 (owner spec: "make each round sorta unique ... less tedious"
+// + "add a few more bosses anyways"): the roster goes 26 -> 31 — one new body per pool
+// where repetition bites, every arena now rolls FOUR lieutenants. THE LEDGER (555) joins
+// the gold tax office, HOLLOW REGENT (590) the platinum gate, PRESSURE SAINT (648) the
+// diamond deep, THE MARSHAL (668) the crimson court, PALE LEVIATHAN (690, 4 phases) the
+// iridescent endgame. The engine now also rolls ROUND VARIETY mutators with every queue
+// (see MUTATORS in engine.js) — boss data here is untouched by them except minion HP
+// (BROOD BLIGHT) and they never change spawn counts or caps (summon-cadence law).
 // A test pins the calibration: silver-band HP must stay within 480..560, bronze <= 300,
 // gold strictly past the silver anchor and under 600, beyond strictly above silver.
 // A second test pins OWNERSHIP: the seven arena pools are pairwise disjoint and their
@@ -169,7 +177,7 @@
 
     // ================= GOLD BAND — the Tide's tax collectors (owner spec, ARENA POOLS) =================
     // Strictly past the DEATHWARRANT anchor (520), under the old gods (600): the GOLD
-    // arena rolls ONLY these three. 3 phases, real pacing — the first rank that fights
+    // arena rolls ONLY these four. 3 phases, real pacing — the first rank that fights
     // for it, not against children. Ordered by base HP.
     {
       id: 'brassherald', name: 'BRASS HERALD', hp: 525, r: 11, band: 'gold',
@@ -204,11 +212,26 @@
         { until: 0.33, gap: 0.95, patterns: [ring(8, 48, 0.8), aimed(2, 12, 74, 0.7)] }
       ]
     },
+    {
+      id: 'ledger', name: 'THE LEDGER', hp: 555, r: 11, band: 'gold',
+      title: 'THE DEBT THAT OUTLIVES YOU',
+      brief: "Every collector answers to this book. It stamps the floor with ink taxes and keeps the change in stamp volleys — and the debt compounds every phase.",
+      tint: '#c8b464',
+      phases: [
+        // hit-diag retune (probe, seeds 1-8 @GOLD): the shipped p1 paired ink pools with
+        // a stamp cone — the herding pair walked the bot into shots (and seed 2 died to
+        // two phase-2 stamps). One pressure theme per phase: pools+ring, then stamps+ring.
+        { until: 1, gap: 1.2, patterns: [zone(3, 20, 4.5, 0.75), ring(10, 52, 0.75)] },
+        { until: 0.66, gap: 1.05, patterns: [shotgun(2, 3, 20, 72, 0.65, 0.55), ring(11, 54, 0.7)] },
+        { until: 0.33, gap: 0.95, patterns: [ring(12, 56, 0.65), zone(3, 18, 4, 0.65)] }
+      ]
+    },
 
-    // ================= BEYOND BAND — past the champion (one exclusive trio per rank) =================
+    // ================= BEYOND BAND — past the champion (one exclusive quartet per rank) =================
     // Ordered by base HP so the ladder escalates: PLATINUM -> gravewake/cindermaw/
-    // ironchoir, DIAMOND -> theloom/dredgewarden/fathom, CRIMSON -> maelstrom/
-    // goreprelate/nullsovereign, IRIDESCENT -> theglutton/oldwater/tideunbound.
+    // hollowregent/ironchoir, DIAMOND -> theloom/dredgewarden/fathom/pressuresaint,
+    // CRIMSON -> maelstrom/goreprelate/nullsovereign/marshal, IRIDESCENT -> theglutton/
+    // paleleviathan/oldwater/tideunbound.
     {
       id: 'gravewake', name: 'GRAVEWAKE', hp: 560, r: 12, band: 'beyond',
       title: "THE TIDE'S REGURGITANT",
@@ -238,6 +261,17 @@
         { until: 1, gap: 1.15, patterns: [zone(3, 22, 4.5, 0.7), ring(13, 58, 0.65)] },
         { until: 0.66, gap: 1.0, patterns: [zone(4, 24, 5, 0.65), shotgun(2, 4, 26, 76, 0.65, 0.5), ring(14, 60, 0.6)] },
         { until: 0.33, gap: 0.95, patterns: [zone(4, 24, 5, 0.6), ring(15, 60, 0.55), shotgun(3, 4, 28, 78, 0.6, 0.5)] }
+      ]
+    },
+    {
+      id: 'hollowregent', name: 'HOLLOW REGENT', hp: 590, r: 12, band: 'beyond',
+      title: 'A CROWN WITH NOTHING INSIDE',
+      brief: "The first gate past the champion keeps an empty king. It charges like a verdict and rings like a bell, and there is nothing behind the eyes to reason with.",
+      tint: '#9fb0c8',
+      phases: [
+        { until: 1, gap: 1.2, patterns: [charge(160, 0.55, 0.75), ring(12, 56, 0.7)] },
+        { until: 0.66, gap: 1.05, patterns: [charge(168, 0.6, 0.7), aimed(3, 16, 78, 0.65), ring(13, 58, 0.65)] },
+        { until: 0.33, gap: 0.95, patterns: [charge(176, 0.6, 0.65), ring(14, 58, 0.6), spiral(3, 0.15, 6, 56, 0.6)], enrage: true }
       ]
     },
     {
@@ -286,6 +320,17 @@
       ]
     },
     {
+      id: 'pressuresaint', name: 'PRESSURE SAINT', hp: 648, r: 12, band: 'beyond',
+      title: 'IT PRAYS IN THE DEEP',
+      brief: 'The deep pressure found a congregation. Prayer-spikes thread the bubble rings while silt squares off the floor — faith at forty atmospheres.',
+      tint: '#5ac0e0',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [aimed(2, 8, 80, 0.65), zone(3, 20, 4.5, 0.7)] },
+        { until: 0.66, gap: 0.95, patterns: [ring(13, 58, 0.65), zone(3, 22, 4, 0.65), spiral(3, 0.14, 6, 58, 0.6)] },
+        { until: 0.33, gap: 0.9, patterns: [spiral(4, 0.13, 7, 60, 0.55), ring(14, 60, 0.55), aimed(3, 14, 82, 0.55)] }
+      ]
+    },
+    {
       id: 'maelstrom', name: 'MAELSTROM', hp: 650, r: 13, band: 'beyond',
       title: 'THE DROWNED VORTEX',
       brief: "The FATHOM's hungry cousin. Everything spirals inward — bullets, brood, the floor itself. Swim against it or sink.",
@@ -320,6 +365,17 @@
       ]
     },
     {
+      id: 'marshal', name: 'THE MARSHAL', hp: 668, r: 13, band: 'beyond',
+      title: "THE KING'S EXECUTIONER",
+      brief: "The crimson court keeps its own law. Verdict shotguns and sentence charges — the axe falls faster every phase, and the last one is angry.",
+      tint: '#c93c50',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [shotgun(2, 4, 24, 74, 0.7, 0.5), charge(164, 0.6, 0.7)] },
+        { until: 0.66, gap: 1.0, patterns: [sweep(60, 2.3, 3, 0.6), shotgun(2, 4, 26, 76, 0.65, 0.5), ring(12, 58, 0.65)] },
+        { until: 0.33, gap: 0.9, patterns: [charge(174, 0.6, 0.65), spiral(4, 0.13, 7, 58, 0.6), ring(13, 58, 0.6)], enrage: true }
+      ]
+    },
+    {
       id: 'theglutton', name: 'THE GLUTTON', hp: 680, r: 13, band: 'beyond',
       title: 'IT DEVOURS THE PIT',
       brief: "The Tide's hunger given a body. It eats floor, brood and light — everything except you, so far. Starve it or feed it.",
@@ -328,6 +384,18 @@
         { until: 1, gap: 1.15, patterns: [zone(3, 22, 4.5, 0.7), aimed(3, 16, 78, 0.65)] },
         { until: 0.66, gap: 1.0, patterns: [spawn(2, 4, 0.6), shotgun(2, 3, 24, 74, 0.65, 0.5), ring(14, 60, 0.6)] },
         { until: 0.33, gap: 0.9, patterns: [spawn(2, 3, 0.55), zone(3, 20, 4.5, 0.6), aimed(3, 20, 84, 0.55)] }
+      ]
+    },
+    {
+      id: 'paleleviathan', name: 'PALE LEVIATHAN', hp: 690, r: 13, band: 'beyond',
+      title: 'THE FIRST THING THE TIDE DROWNED',
+      brief: "Older than the collectors, older than the king — the first thing the Tide ever drowned, still swimming. Twin beams, tight spirals, and a brood that hatches angry.",
+      tint: '#bfe8d8',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [sweep(58, 2.3, 3, 0.6), ring(13, 58, 0.65)] },
+        { until: 0.75, gap: 1.0, patterns: [spiral(4, 0.13, 7, 58, 0.6), ring(14, 58, 0.6), aimed(3, 16, 80, 0.6)] },
+        { until: 0.5, gap: 0.95, patterns: [zone(3, 22, 4.5, 0.6), spiral(5, 0.12, 8, 60, 0.55), ring(15, 60, 0.55)] },
+        { until: 0.25, gap: 0.9, patterns: [sweep(60, 2.4, 3, 0.55, 2), spiral(4, 0.13, 8, 58, 0.5), spawn(2, 4, 0.55)], enrage: true }
       ]
     },
     {
