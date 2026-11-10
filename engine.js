@@ -486,6 +486,10 @@
   // (bronze/silver/gold 3/3) and at base for the beyond band (BULWARK 3/3).
   // PLATINUM+ presets remain the designed beyond-bot wall — humans outplay the bot
   // there (see AGENTS.md; the suite survival-gates them instead of demanding clears).
+  // ONE endability exception (BROOD TAX 2026.11.13): GRAVEWAKE is win-gated at the
+  // PLATINUM preset — its brood phase shipped summoning every 2nd pattern (the player's
+  // exact minion kill rate), so the swarm never emptied and the fight could not END.
+  // Summon cadence law: spawner phases keep spawn at most 1-of-3 patterns, cap <= 4-6.
   const RANKS = [
     { name: 'BRONZE', tier: 1, min: 0, max: 200, pool: [0, 1, 2, 3, 4] },
     { name: 'BRONZE', tier: 2, min: 200, max: 300, pool: [0, 1, 2, 3, 4] },

@@ -26,6 +26,8 @@ Top 5 board: crack the board by SR (qualifying 4000). Season 1 is live.
 
 Phases are not a pattern swap. Every phase the whole fight escalates on one engine-side curve (`AGGRO` in `engine.js`): patterns cycle sooner (gaps and recover compress), telegraphs snap a beat tighter (never below the 0.5 s fairness floor), and **every projectile leaves faster**. Enrage final phases stack a last-stand multiplier on top of the curve. And the transition itself answers you: the fairness wipe ends with a **gold retaliation ring** bursting out of the boss — slower than your run speed, so you can walk through it, but it will catch you standing still.
 
+One more rule the tests now enforce: a fight must be **endable**. GRAVEWAKE's brood phase used to summon exactly as fast as any player could kill minions — the swarm never emptied, your gun was stuck on blob cleanup, and the boss barely took damage (measured by probe: a 244-second phase, 140 minion kills, unwinnable fight). The REGURGITANT now summons **1-of-3 patterns with the swarm capped at 4** — the brood still hunts you and stragglers chase into later phases, but it can be outkilled (brood phase 244s → 59s; the suite pins the PLATINUM-preset fight clearable 3/3 as the summon-stall regression). A boss you can survive but never finish is a bug, not a wall.
+
 ## The roster — 26 bosses, 4 weight classes
 
 | Band | Bosses |
@@ -53,7 +55,7 @@ npm test      # PIT sim suite (must pass before every push)
 The sim suite runs the engine headlessly in Node and gates every release three ways:
 
 1. **The dodge-bot clears the bronze band at the BRONZE preset, the whole silver band at the SILVER preset, and the gold band at the GOLD preset, 3/3 fixed seeds each** (plus a flawless GATEKEEPER proof) — if a ladder boss cannot be beaten, it does not ship.
-2. **BULWARK (the siege frame) proves the beyond band at base, 3/3 seeds — all twelve of them.** Platinum+ presets are the documented beyond-bot zone — the suite survival-gates them instead of demanding full clears.
+2. **BULWARK (the siege frame) proves the beyond band at base, 3/3 seeds — all twelve of them.** Platinum+ presets are the documented beyond-bot zone — the suite survival-gates them instead of demanding full clears, with one endability exception: **GRAVEWAKE must stay clearable at the PLATINUM preset (3/3)** — the summon-stall regression pin (a boss the player survives but can never finish is a bug, not a wall).
 3. **The dashless casual reference** (same bot brain, dash disabled) must clear the bronze tutorial on at least half its seeds and never clear the DEATHWARRANT area — HIVE MOTHER is knowingly kite-able without dash (spiral gaps; logged as INFO, not a leak).
 
 Plus the **arena-ownership invariants** (seven exclusive pools of ≥ 3, pairwise disjoint, union = the whole roster, pool weight escalating arena by arena), the **phase-fury behavior pins** (curve monotonicity, tele-floor survival, burst-ring speed below run speed, wipe-per-transition), fairness probes from live sims, ranked-economy unit tests (SR deltas, promotions, unlocks, save migration, seasons, Top 5), and a random-input fuzz across all 26 bosses.
@@ -70,6 +72,6 @@ Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, 
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.12 // PHASE FURY** (bust `20261110h`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.13 // BROOD TAX** (bust `20261110i`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

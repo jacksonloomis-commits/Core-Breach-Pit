@@ -1,8 +1,13 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.12';
+  const BUILD = '2026.11.13';
   const UPDATE_LOG = [
+    { version: '2026.11.13', tag: 'BROOD TAX', items: [
+      'FIXED (owner report): GRAVEWAKE was just about unbeatable — its brood phase summoned every 2nd pattern, which is exactly the rate a player can kill minions, so the swarm never emptied, your gun was stuck on blob cleanup and the boss barely took damage. Measured by probe: a 244-second brood phase, 70 spawn events, 140 minion kills, fight unwinnable',
+      'THE BROOD IS TAXED: the REGURGITANT now summons 1-of-3 patterns with the swarm capped at 4 (was every-2nd, cap 5). The brood still hunts you and stragglers chase into later phases — it can just be outkilled now. Measured: brood phase 244s -> 59s, PLATINUM-preset fight BULWARK 5/6 clears at ~129s',
+      'NEW HOUSE LAW: a boss fight must be ENDABLE at its rank preset — a boss you survive but can never finish is a bug, not a wall. The suite now pins GRAVEWAKE clearable at the PLATINUM preset 3/3 as the summon-stall regression, and AGENTS.md carries the cadence law for every future spawner phase'
+    ] },
     { version: '2026.11.12', tag: 'PHASE FURY', items: [
       'BOSS PHASES NOW ACTUALLY DO SOMETHING (owner spec): every phase the whole fight escalates — patterns cycle sooner, telegraphs snap a beat tighter (never under the 0.5s fairness floor) and every projectile leaves faster. Enrage final phases stack on top of the curve and hit harder than ever',
       'PHASE TRANSITIONS FIGHT BACK: the fairness wipe now ends with a gold retaliation ring bursting out of the boss — slower than your run speed, so walk through it, but it will catch you standing still',

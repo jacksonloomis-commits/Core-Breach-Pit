@@ -582,6 +582,27 @@ console.log('--- Dodge-bot: beyond band at base (BULWARK, the siege frame) — 1
     check(`${b.name} cleared 3/3 at base by BULWARK (${details.join(' ')})`, wins === 3);
   }
 }
+console.log('--- Summon-stall regression: a fight must be ENDABLE at its rank preset ---');
+{
+  // BROOD TAX (owner report: GRAVEWAKE was "just about unbeatable due to how often it
+  // summons"). Its brood phase shipped as [spawn, ring] — the round-robin picker fires a
+  // 2-pattern phase's spawn every 2nd cycle (~0.58 minions/s at PLATINUM pacing), exactly
+  // the player's minion kill rate, so the swarm never emptied and boss DPS collapsed to
+  // ~10% (measured: 244s phase, 70 spawn events, 140 kills, bot stalled at 50%/19% for
+  // 300s while taking 0-1 hits). The brood is taxed to 1-of-3 patterns with cap 4;
+  // measured reality now: BULWARK clears the PLATINUM preset 3/3 at ~129s. This pin is
+  // the AGENTS.md summon-cadence law in test form: a boss the player survives but can
+  // never finish is a BUG, not a wall. It is a deliberate endability exception to the
+  // beyond-bot wall doctrine (which stays survival-only for the other platinum+ bosses).
+  let wins = 0;
+  const details = [];
+  for (const seed of [1, 2, 3]) {
+    const { st, time } = runFight(idxOf('gravewake'), 'bulwark', seed, 300, { mods: PIT.RANK_MODS.PLATINUM });
+    details.push(`${seed}:${st.over === 'win' ? 'WIN' : (st.over || 'timeout')}@${Math.round(time)}s,h${st.player.hearts}`);
+    if (st.over === 'win') wins++;
+  }
+  check(`GRAVEWAKE endable at the PLATINUM preset — summon-stall regression (3/3: ${details.join(' ')})`, wins === 3);
+}
 console.log('--- Operative coverage on the calibrated bands ---');
 {
   const silverMods = PIT.RANK_MODS.SILVER;
@@ -686,8 +707,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.12', APP.includes("const BUILD = '2026.11.12'"));
-  check('app.js update log leads with PHASE FURY', APP.includes("tag: 'PHASE FURY'") && APP.indexOf("tag: 'PHASE FURY'") < APP.indexOf("tag: 'ARENA POOLS'"));
+  check('app.js pins BUILD 2026.11.13', APP.includes("const BUILD = '2026.11.13'"));
+  check('app.js update log leads with BROOD TAX', APP.includes("tag: 'BROOD TAX'") && APP.indexOf("tag: 'BROOD TAX'") < APP.indexOf("tag: 'PHASE FURY'"));
+  check('app.js logs the PHASE FURY entry', APP.includes("tag: 'PHASE FURY'"));
   check('app.js logs the ARENA POOLS entry', APP.includes("tag: 'ARENA POOLS'"));
   check('app.js logs the BOSS EXPANSION entry', APP.includes("tag: 'BOSS EXPANSION'"));
   check('app.js logs the RANKED BETA entry', APP.includes("tag: 'RANKED BETA'"));
@@ -697,9 +719,18 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.12 // PHASE FURY', IDX.includes('BUILD 2026.11.12 // CORE BREACH: PIT — PHASE FURY'));
+  check('index.html footer stamps BUILD 2026.11.13 // BROOD TAX', IDX.includes('BUILD 2026.11.13 // CORE BREACH: PIT — BROOD TAX'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110h', busts.length === 7 && busts.every(t => t === '?v=20261110h'), busts.join(','));
+  check('all 7 asset tags bust at 20261110i', busts.length === 7 && busts.every(t => t === '?v=20261110i'), busts.join(','));
+  {
+    // BROOD TAX data pin: the summon cadence law for the reported boss — the brood phase
+    // keeps spawn at most 1-of-3 patterns with the swarm capped at 4.
+    const gw = BOSSES.LIST.find(b => b.id === 'gravewake');
+    const brood = gw.phases[1].patterns;
+    const sp = brood.find(p => p.type === 'spawn');
+    check('GRAVEWAKE brood phase obeys the summon cadence law (spawn 1-of-3, cap 4)',
+      brood.length === 3 && brood.filter(p => p.type === 'spawn').length === 1 && sp && sp.max === 4 && sp.count === 2);
+  }
   check('engine hurt() honors PHASE intangibility', ENG.includes('if (p.phase > 0) return false;'));
   check('engine carries the PHASE FURY aggression curve and burst ring', ENG.includes('const AGGRO') && ENG.includes("kind: 'phase'") && ENG.includes('aggroAt('));
   check('engine has no arena-progression references left', !ENG.includes('ARENAS'));

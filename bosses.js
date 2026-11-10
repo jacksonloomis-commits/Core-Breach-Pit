@@ -216,7 +216,15 @@
       tint: '#7a4ae0',
       phases: [
         { until: 1, gap: 1.25, patterns: [shotgun(2, 4, 26, 74, 0.65, 0.55), ring(13, 56, 0.7)] },
-        { until: 0.75, gap: 1.15, patterns: [spawn(2, 5, 0.6), ring(13, 58, 0.65)] },
+        // BROOD TAX (owner report: "just about unbeatable due to how often it summons"):
+        // this phase shipped as [spawn, ring] — the round-robin picker fired the spawn
+        // every 2nd pattern (~0.58 minions/s at the PLATINUM pacing), which is exactly
+        // the player's minion kill rate, so the swarm never emptied and boss DPS
+        // collapsed to ~10% for the whole phase (measured: 244s phase, 70 spawn events,
+        // 140 minion kills, fight unwinnable). Spawn is now 1-of-3 with the cap at 4 —
+        // the brood still hunts you, but it can be OUTKILLED. Summon cadence law in
+        // AGENTS.md; the suite pins GRAVEWAKE@PLATINUM as endable.
+        { until: 0.75, gap: 1.15, patterns: [spawn(2, 4, 0.6), ring(13, 58, 0.65), ring(12, 58, 0.65)] },
         { until: 0.5, gap: 1.0, patterns: [sweep(56, 2.3, 3, 0.65), shotgun(2, 4, 26, 76, 0.6, 0.5)] },
         { until: 0.25, gap: 1.0, patterns: [sweep(58, 2.4, 3, 0.6, 2), shotgun(2, 4, 28, 78, 0.6, 0.5), ring(14, 58, 0.65)], enrage: true }
       ]
