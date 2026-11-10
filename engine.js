@@ -116,7 +116,9 @@
     const pat = phase.patterns[b.rt.patIdx];
     b.rt.pat = pat;
     b.rt.mode = 'tele';
-    b.rt.timer = pat.tele;
+    // PHASE FURY: telegraphs snap a beat tighter every phase, but never below the
+    // 0.5s fairness floor — the law is data-side, this is the engine's escalation.
+    b.rt.timer = Math.max(0.5, pat.tele * aggroAt(b.phase).tele);
     b.rt.sub = 0;      // generic sub-timer (volley gaps, spiral spawn acc)
     b.rt.spawned = 0;  // volleys / minions spawned
     b.rt.data = {};
@@ -141,10 +143,28 @@
     st.events.push({ type: 'tele', pat: pat.type, x: b.x, y: b.y });
   }
 
+  // ---------- PHASE FURY (owner spec: "make boss phases actually do something") ----------
+  // One escalation curve, every boss: each phase the WHOLE fight gets angrier —
+  //   gap   — the pause between patterns compresses (compounds with the phase's own data gap)
+  //   speed — projectiles leave faster (pattern data caps are untouched; the telegraph
+  //           still tells the truth, the bullet just arrives with more intent)
+  //   tele  — telegraphs shorten a beat, never below the 0.5s fairness floor
+  // Enrage (the last-stand flag in bosses.js) now stacks ON TOP of this curve as the
+  // final-phase multiplier: shots/charge/spiral x1.15, gap x0.78.
+  const AGGRO = {
+    gap:   [1, 0.92, 0.85, 0.78],
+    speed: [1, 1.06, 1.12, 1.16],
+    tele:  [1, 0.96, 0.92, 0.88]
+  };
+  function aggroAt(i) {
+    const k = clamp(Math.round(i), 0, AGGRO.gap.length - 1);
+    return { gap: AGGRO.gap[k], speed: AGGRO.speed[k], tele: AGGRO.tele[k] };
+  }
+
   function spawnProj(st, x, y, ang, speed, kind) {
     const def = st.bossDef;
     const phase = def.phases[st.boss.phase];
-    const mult = phase.enrage ? 1.2 : 1;
+    const mult = aggroAt(st.boss.phase).speed * (phase.enrage ? 1.15 : 1);
     st.proj.push({ x, y, vx: Math.cos(ang) * speed * mult, vy: Math.sin(ang) * speed * mult, r: 3, kind: kind || 'shot' });
   }
 
@@ -317,7 +337,16 @@
       b.phase++;
       st.proj.length = 0; st.zones.length = 0; st.beams.length = 0; // fairness wipe
       b.rt = { mode: 'gap', timer: 1.1 * st.mods.gapMult, pat: null, patIdx: -1 };
-      st.events.push({ type: 'phase', n: b.phase });
+      // PHASE FURY: the transition answers you — a gold retaliation ring rides out of
+      // the fairness wipe. Screen is clean, ring is visible from birth, and its speed
+      // (46 + 4/phase, deliberately NO multipliers) stays under the player's run speed
+      // (68): always dodgeable by walking, no telegraph needed. kind:'phase' tints it.
+      const n = 12 + 2 * b.phase, spd = 46 + 4 * b.phase, off = st.rng() * TAU;
+      for (let i = 0; i < n; i++) {
+        const a = off + (TAU * i) / n;
+        st.proj.push({ x: b.x, y: b.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 3, kind: 'phase' });
+      }
+      st.events.push({ type: 'phase', n: b.phase, burst: n });
     }
     ph = def.phases[b.phase];
 
@@ -342,12 +371,12 @@
       if (pat.type === 'charge') execPattern(st, dt); // charge moves boss during active
       if (rt.timer <= 0) {
         rt.mode = 'recover';
-        rt.timer = (typeof ph.recover === 'number') ? ph.recover : 0.25;
+        rt.timer = (typeof ph.recover === 'number' ? ph.recover : 0.25) * aggroAt(b.phase).gap;
         st.beams.length = 0;
       }
     } else if (rt.mode === 'recover' && rt.timer <= 0) {
       rt.mode = 'gap';
-      rt.timer = ph.gap * st.mods.gapMult * (ph.enrage ? 0.78 : 1);
+      rt.timer = ph.gap * st.mods.gapMult * (ph.enrage ? 0.78 : 1) * aggroAt(b.phase).gap;
     }
 
     // --- projectiles
@@ -441,22 +470,22 @@
     IRIDESCENT: { hpMult: 2.0, gapMult: 0.7 }
   };
 
-  // Boss pools (owner spec, ARENA POOLS): indices into bosses.js LIST.
-  // "Each arena should have its own boss pool" — every rank now OWNS an exclusive
-  // pool; no boss rolls in two arenas:
-  //   BRONZE    [0-4]    the bronze band, unchanged ("super ez" by design)
-  //   SILVER    [5-10]   THE DEATHWARRANT AREA, champion weight
-  //   GOLD      [11,12]  the gold band — the Tide's tax collectors
-  //   PLATINUM  [13,14]  gravewake + ironchoir (the first gate past the champion)
-  //   DIAMOND   [15,16]  theloom + fathom
-  //   CRIMSON   [17,18]  maelstrom + nullsovereign
-  //   IRIDESCENT [19,20] theglutton + tideunbound (the Tide itself)
+  // Boss pools (owner spec, ARENA POOLS + PHASE FURY): indices into bosses.js LIST.
+  // "Each arena should have its own boss pool" — every rank owns an EXCLUSIVE pool;
+  // no boss rolls in two arenas. PHASE FURY deepened the five two-boss pools to three:
+  //   BRONZE     [0-4]     the bronze band, unchanged ("super ez" by design)
+  //   SILVER     [5-10]    THE DEATHWARRANT AREA, champion weight
+  //   GOLD       [11-13]   the tax collectors — BRASS HERALD, THE AUDITOR, TOLLMASTER
+  //   PLATINUM   [14-16]   gravewake + cindermaw + ironchoir (first gate past the champion)
+  //   DIAMOND    [17-19]   theloom + dredgewarden + fathom
+  //   CRIMSON    [20-22]   maelstrom + goreprelate + nullsovereign
+  //   IRIDESCENT [23-25]   theglutton + oldwater + tideunbound (the Tide itself)
   // A suite test pins OWNERSHIP: the seven pools are pairwise disjoint and their
-  // union is the entire 21-boss roster. Bot gates: every boss is proven at its
-  // rank preset where VOLT can live there (bronze/silver/gold 3/3) and at base
-  // for the beyond band (BULWARK 3/3). PLATINUM+ presets remain the designed
-  // beyond-bot wall — humans outplay the bot there (see AGENTS.md; the suite
-  // survival-gates them instead of demanding full clears).
+  // union is the entire 26-boss roster, pool max base HP escalating arena by arena.
+  // Bot gates: every boss is proven at its rank preset where VOLT can live there
+  // (bronze/silver/gold 3/3) and at base for the beyond band (BULWARK 3/3).
+  // PLATINUM+ presets remain the designed beyond-bot wall — humans outplay the bot
+  // there (see AGENTS.md; the suite survival-gates them instead of demanding clears).
   const RANKS = [
     { name: 'BRONZE', tier: 1, min: 0, max: 200, pool: [0, 1, 2, 3, 4] },
     { name: 'BRONZE', tier: 2, min: 200, max: 300, pool: [0, 1, 2, 3, 4] },
@@ -464,18 +493,18 @@
     { name: 'SILVER', tier: 1, min: 500, max: 600, pool: [5, 6, 7, 8, 9, 10] },
     { name: 'SILVER', tier: 2, min: 600, max: 700, pool: [5, 6, 7, 8, 9, 10] },
     { name: 'SILVER', tier: 3, min: 700, max: 800, pool: [5, 6, 7, 8, 9, 10] },
-    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [11, 12] },
-    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [11, 12] },
-    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [13, 14] },
-    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [13, 14] },
-    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [13, 14] },
-    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [15, 16] },
-    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [15, 16] },
-    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [15, 16] },
-    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [17, 18] },
-    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [17, 18] },
-    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [17, 18] },
-    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [19, 20] }
+    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [11, 12, 13] },
+    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [11, 12, 13] },
+    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [14, 15, 16] },
+    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [14, 15, 16] },
+    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [14, 15, 16] },
+    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [17, 18, 19] },
+    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [17, 18, 19] },
+    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [17, 18, 19] },
+    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [20, 21, 22] },
+    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [20, 21, 22] },
+    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [20, 21, 22] },
+    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [23, 24, 25] }
   ];
 
   function rankFor(sr) {
@@ -566,6 +595,7 @@
 
   return {
     W, H, HUD, AR, CHARS, BOSSES, createRun, step, hurt, mulberry32, segDist, clamp, dist,
+    AGGRO, aggroAt,
     SR, srDelta, RANKS, RANK_MODS, rankFor, rankLabel, rankMods, tierProgress,
     CHAR_UNLOCK_SR, applyRankedResult, TOP5_QUALIFY, TOP5_MOCK, leaderboardWith,
     SEASON, defaultRankedSave, seasonEnd, migrateSave

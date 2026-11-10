@@ -8,36 +8,40 @@ Static browser game: HTML/CSS/JS, no build step, no backend, no accounts, no net
 
 ## The ranked ladder
 
-Stars are gone. Every queue rolls a random boss from your rank's pool — and **each arena owns its pool exclusively**: no boss rolls in two arenas (pinned by tests). Wins bank SR by the hearts you keep (full HP +30 · one heart +15 · two −5 · three or more −20 · flatline −10). SR never resets — seasons only award cosmetic badges on top.
+Stars are gone. Every queue rolls a random boss from your rank's pool — and **each arena owns its pool exclusively**: no boss rolls in two arenas, and every arena rolls at least **three** bodies (pinned by tests). Wins bank SR by the hearts you keep (full HP +30 · one heart +15 · two −5 · three or more −20 · flatline −10). SR never resets — seasons only award cosmetic badges on top.
 
 | Rank | SR | Mods (HP × / GAP ×) | Boss pool (exclusive to this arena) |
 | --- | --- | --- | --- |
 | BRONZE 1–3 | 0–500 | 1.0 / 1.0 | GATEKEEPER · BILESPITTER · GNASHER · CINDERMITE · THRESHER |
 | SILVER 1–3 | 500–800 | 1.05 / 1.0 | **the DEATHWARRANT area** — THE SURGEON · HIVE MOTHER · DEATHWARRANT · PALE HERALD · GLOAMWARDEN · CARRION LAW |
-| GOLD 1–2 | 800–1100 | 1.2 / 0.9 | the tax collectors — TOLLMASTER · BRASS HERALD |
-| PLATINUM 1–3 | 1100–2000 | 1.5 / 0.85 | GRAVEWAKE · IRON CHOIR |
-| DIAMOND 1–3 | 2000–2500 | 1.7 / 0.8 | THE LOOM · THE FATHOM |
-| CRIMSON 1–3 | 2500–3500 | 1.85 / 0.75 | MAELSTROM · NULL SOVEREIGN |
-| IRIDESCENT | 3500+ | 2.0 / 0.7 | THE GLUTTON · TIDE UNBOUND |
+| GOLD 1–2 | 800–1100 | 1.2 / 0.9 | the tax collectors — BRASS HERALD · THE AUDITOR · TOLLMASTER |
+| PLATINUM 1–3 | 1100–2000 | 1.5 / 0.85 | GRAVEWAKE · CINDERMAW · IRON CHOIR |
+| DIAMOND 1–3 | 2000–2500 | 1.7 / 0.8 | THE LOOM · DREDGEWARDEN · THE FATHOM |
+| CRIMSON 1–3 | 2500–3500 | 1.85 / 0.75 | MAELSTROM · GORE PRELATE · NULL SOVEREIGN |
+| IRIDESCENT | 3500+ | 2.0 / 0.7 | THE GLUTTON · OLD WATER · TIDE UNBOUND |
 
 Top 5 board: crack the board by SR (qualifying 4000). Season 1 is live.
 
-## The roster — 21 bosses, 4 weight classes
+## Boss phases get angry — PHASE FURY
+
+Phases are not a pattern swap. Every phase the whole fight escalates on one engine-side curve (`AGGRO` in `engine.js`): patterns cycle sooner (gaps and recover compress), telegraphs snap a beat tighter (never below the 0.5 s fairness floor), and **every projectile leaves faster**. Enrage final phases stack a last-stand multiplier on top of the curve. And the transition itself answers you: the fairness wipe ends with a **gold retaliation ring** bursting out of the boss — slower than your run speed, so you can walk through it, but it will catch you standing still.
+
+## The roster — 26 bosses, 4 weight classes
 
 | Band | Bosses |
 | --- | --- |
 | **BRONZE — the warm-up** (kept easy on purpose) | GATEKEEPER · BILESPITTER · GNASHER · CINDERMITE · THRESHER |
 | **SILVER — the DEATHWARRANT area** (champion weight, pinned 480–560 base HP by tests) | THE SURGEON · HIVE MOTHER · DEATHWARRANT (the anchor) · PALE HERALD · GLOAMWARDEN · CARRION LAW |
-| **GOLD — the tax collectors** (strictly past the anchor, under 600) | TOLLMASTER (545) · BRASS HERALD (525) |
-| **BEYOND the champion** (560–720, one exclusive pair per rank, ordered by weight) | GRAVEWAKE · IRON CHOIR · THE LOOM · THE FATHOM · MAELSTROM · NULL SOVEREIGN · THE GLUTTON · TIDE UNBOUND (720 — the Tide itself) |
+| **GOLD — the tax collectors** (strictly past the anchor, under 600) | BRASS HERALD (525) · THE AUDITOR (535) · TOLLMASTER (545) |
+| **BEYOND the champion** (560–720, one exclusive trio per rank, ordered by weight) | GRAVEWAKE · CINDERMAW · IRON CHOIR · THE LOOM · DREDGEWARDEN · THE FATHOM · MAELSTROM · GORE PRELATE · NULL SOVEREIGN · THE GLUTTON · OLD WATER (700) · TIDE UNBOUND (720 — the Tide itself) |
 
-THE SURGEON (280 → 500) and HIVE MOTHER (440 → 480) were rebuilt into the champion weight class; DEATHWARRANT itself is untouched — the whole silver band is calibrated to it. Higher ranks send heavier lieutenants with more HP and tighter pacing; telegraphs and speeds are never scaled.
+THE SURGEON (280 → 500) and HIVE MOTHER (440 → 480) were rebuilt into the champion weight class; DEATHWARRANT itself is untouched — the whole silver band is calibrated to it. Higher ranks send heavier lieutenants with more HP and tighter pacing; telegraphs and speeds are never scaled by rank.
 
 **Operatives** (unlock by SR now): VOLT (starter, overcharge), GHOST (Silver, 500 SR — phase: walk through anything), BULWARK (Platinum, 1100 SR — frontal barrier).
 
 **Controls:** WASD/arrows move · SPACE/SHIFT dash (i-frames) · E ability · P/ESC pause. Your gun auto-fires at the nearest hostile; the game is positioning, dash timing, and pattern reading.
 
-**Fairness law:** every attack is telegraphed for at least 0.5 s (gold flash, dashed charge lines, outlined pools), projectile and charge speeds are capped, floor pools can never appear on top of you, and phase transitions wipe live bullets for a breather. All of this is asserted by tests.
+**Fairness law:** every attack is telegraphed for at least 0.5 s (gold flash, dashed charge lines, outlined pools — even under the fury curve's tele compression), projectile and charge speeds are capped, floor pools can never appear on top of you, and phase transitions wipe live bullets before the burst ring spawns. All of this is asserted by tests.
 
 ## Run and test
 
@@ -49,23 +53,23 @@ npm test      # PIT sim suite (must pass before every push)
 The sim suite runs the engine headlessly in Node and gates every release three ways:
 
 1. **The dodge-bot clears the bronze band at the BRONZE preset, the whole silver band at the SILVER preset, and the gold band at the GOLD preset, 3/3 fixed seeds each** (plus a flawless GATEKEEPER proof) — if a ladder boss cannot be beaten, it does not ship.
-2. **BULWARK (the siege frame) proves the beyond band at base, 3/3 seeds — all eight of them.** Platinum+ presets are the documented beyond-bot zone — the suite survival-gates them instead of demanding full clears.
+2. **BULWARK (the siege frame) proves the beyond band at base, 3/3 seeds — all twelve of them.** Platinum+ presets are the documented beyond-bot zone — the suite survival-gates them instead of demanding full clears.
 3. **The dashless casual reference** (same bot brain, dash disabled) must clear the bronze tutorial on at least half its seeds and never clear the DEATHWARRANT area — HIVE MOTHER is knowingly kite-able without dash (spiral gaps; logged as INFO, not a leak).
 
-Plus the **arena-ownership invariants** (seven exclusive pools, pairwise disjoint, union = the whole roster, pool weight escalating arena by arena), fairness probes from live sims, ranked-economy unit tests (SR deltas, promotions, unlocks, save migration, seasons, Top 5), and a random-input fuzz across all 21 bosses.
+Plus the **arena-ownership invariants** (seven exclusive pools of ≥ 3, pairwise disjoint, union = the whole roster, pool weight escalating arena by arena), the **phase-fury behavior pins** (curve monotonicity, tele-floor survival, burst-ring speed below run speed, wipe-per-transition), fairness probes from live sims, ranked-economy unit tests (SR deltas, promotions, unlocks, save migration, seasons, Top 5), and a random-input fuzz across all 26 bosses.
 
 Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, not broken** — cleared arenas + stars convert to starting SR (100 per arena + 20 per star; a full 5-arena/15-star save lands at 800 SR, Gold 1).
 
 ## Architecture
 
-- `engine.js` — pure rules/sim engine (no DOM): player, dash i-frames, hitscan, projectiles, beams, zones, minions, boss pattern interpreter, ranked ladder (SR economy, rank pools + modifiers, seasons, Top 5, save migration). Runs in the browser and in Node.
-- `chars.js`, `bosses.js` — pure data: operatives; the 21-boss roster with `band` weight classes (bronze / silver / gold / beyond), built from pattern primitives (aimed / ring / shotgun / sweep / charge / zone / spiral / spawn).
+- `engine.js` — pure rules/sim engine (no DOM): player, dash i-frames, hitscan, projectiles, beams, zones, minions, boss pattern interpreter, the PHASE FURY aggression curve + transition burst ring, ranked ladder (SR economy, rank pools + modifiers, seasons, Top 5, save migration). Runs in the browser and in Node.
+- `chars.js`, `bosses.js` — pure data: operatives; the 26-boss roster with `band` weight classes (bronze / silver / gold / beyond), built from pattern primitives (aimed / ring / shotgun / sweep / charge / zone / spiral / spawn).
 - `palette.js` — 16-color retro palette. `audio.js` — WebAudio bleep synth, no assets.
 - `app.js` — fixed-timestep loop, pixel renderer, ranked hub (rank card, ladder, Top 5, arena-pool roster), results, localStorage save.
 - `tests/sim-test.js` — everything above. `scripts/run-tests.js` — the runner.
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.11 // ARENA POOLS** (bust `20261110g`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.12 // PHASE FURY** (bust `20261110h`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

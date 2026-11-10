@@ -1,8 +1,10 @@
 // CORE BREACH: PIT — headless sim test suite.
 // The dodge-bot must beat the whole roster: VOLT proves the bronze + silver + gold
-// ladder at their rank presets (silver IS the DEATHWARRANT area, owner spec), BULWARK
-// proves the beyond band at base. Every arena owns an EXCLUSIVE pool (no boss rolls in
-// two arenas). The dashless casual reference must clear the tutorial only.
+// ladders at their rank presets (silver IS the DEATHWARRANT area, owner spec), BULWARK
+// proves the beyond band at base. Every arena owns an EXCLUSIVE pool of >= 3 bosses (no
+// boss rolls in two arenas). Boss phases escalate the whole fight along the engine's
+// AGGRO curve and every transition fires a walkable gold burst ring. The dashless
+// casual reference must clear the tutorial only.
 const PIT = require('../engine.js');
 const BOSSES = require('../bosses.js');
 const CHARS = require('../chars.js');
@@ -129,12 +131,12 @@ function runFight(boss, charId, seed, capSec, opts = {}) {
 }
 
 // ================= data integrity =================
-console.log('--- Data integrity (ARENA POOLS) ---');
-check('21 bosses defined', BOSSES.LIST.length === 21, String(BOSSES.LIST.length));
-check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 21);
-check('bands: 5 bronze / 6 silver / 2 gold / 8 beyond',
+console.log('--- Data integrity (ARENA POOLS + PHASE FURY) ---');
+check('26 bosses defined', BOSSES.LIST.length === 26, String(BOSSES.LIST.length));
+check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 26);
+check('bands: 5 bronze / 6 silver / 3 gold / 12 beyond',
   bandBosses('bronze').length === 5 && bandBosses('silver').length === 6 &&
-  bandBosses('gold').length === 2 && bandBosses('beyond').length === 8,
+  bandBosses('gold').length === 3 && bandBosses('beyond').length === 12,
   `${bandBosses('bronze').length}/${bandBosses('silver').length}/${bandBosses('gold').length}/${bandBosses('beyond').length}`);
 check('every boss carries title, brief and tint', BOSSES.LIST.every(b => b.title && b.brief && b.tint && b.band));
 
@@ -165,11 +167,11 @@ check(`beyond band is past the champion (HP ${Math.min(...beyondHP)}..${Math.max
   });
   const union = pools.flatMap(x => x.p);
   const disjoint = pools.every((a, i) => pools.every((b, j) => i >= j || a.p.every(i => !b.p.includes(i))));
-  check(`the ladder has 7 arenas, each owning a pool of >= 2 bosses (${names.join('/')})`,
-    names.length === 7 && pools.every(x => x.p.length >= 2), pools.map(x => `${x.n}:${x.p.length}`).join(' '));
+  check(`the ladder has 7 arenas, each owning a pool of >= 3 bosses (${names.join('/')})`,
+    names.length === 7 && pools.every(x => x.p.length >= 3), pools.map(x => `${x.n}:${x.p.length}`).join(' '));
   check('no boss rolls in two arenas (pools pairwise disjoint)', disjoint);
-  check('the pools cover the whole roster (all 21 bosses reachable somewhere)',
-    new Set(union).size === 21 && union.length === 21, `union ${new Set(union).size}/21`);
+  check('the pools cover the whole roster (all 26 bosses reachable somewhere)',
+    new Set(union).size === 26 && union.length === 26, `union ${new Set(union).size}/26`);
   const bandOf = { BRONZE: 'bronze', SILVER: 'silver', GOLD: 'gold' };
   check('bronze/silver/gold arenas roll only their own band',
     pools.filter(x => bandOf[x.n]).every(x => x.p.every(i => BOSSES.LIST[i].band === bandOf[x.n])));
@@ -224,7 +226,101 @@ check(`every pattern telegraphs >= 0.5s (min ${minTele}s)`, teleOK);
 check('projectile speeds capped at 90', speedOK);
 check('charge speeds capped at 190', chargeOK);
 check('phase thresholds descend; enrage only on the final phase', enrageOK);
+// PHASE FURY data-side pins: the fairness floor must survive the engine's tele
+// compression at the deepest curve step, and the escalation data is monotonic.
+check('fury tele compression keeps every telegraph >= 0.5s (max compression, floor applied)',
+  BOSSES.LIST.every(b => b.phases.every(ph => ph.patterns.every(pat =>
+    Math.max(0.5, pat.tele * PIT.AGGRO.tele[PIT.AGGRO.tele.length - 1]) >= 0.5))));
+check('fury curve escalates monotonically (gaps shrink, speeds and tele compression grow)',
+  PIT.AGGRO.gap.every((g, i) => i === 0 || g < PIT.AGGRO.gap[i - 1]) &&
+  PIT.AGGRO.speed.every((s, i) => i === 0 || s > PIT.AGGRO.speed[i - 1]) &&
+  PIT.AGGRO.tele.every((t, i) => i === 0 || t < PIT.AGGRO.tele[i - 1]));
+check('fury curve clamps past its last step (aggroAt never falls off the table)',
+  JSON.stringify(PIT.aggroAt(99)) === JSON.stringify(PIT.aggroAt(PIT.AGGRO.gap.length - 1)) &&
+  PIT.aggroAt(0).gap === 1 && PIT.aggroAt(0).speed === 1);
 check('3 operatives defined, starter is VOLT', CHARS.LIST.length === 3 && CHARS.LIST[0].id === 'volt');
+
+// ================= phase fury (owner spec: phases must DO something) =================
+console.log('--- Phase fury: the engine escalates every phase ---');
+{
+  // drive the pattern runtime directly: prime a ring cast (same pattern OBJECT at every
+  // phase, so only the engine curve can move the speed) and read the spawned velocity
+  function ringShotSpeed(bossId, phaseIdx) {
+    const st = PIT.createRun({ boss: bossId, charId: 'volt', seed: 77 });
+    st.boss.phase = phaseIdx;
+    const pat = st.bossDef.phases[0].patterns.find(p => p.type === 'ring'); // same data everywhere
+    st.boss.rt = { mode: 'tele', timer: 0.001, pat, patIdx: 0, data: {}, spawned: 0, sub: 0 };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    return Math.hypot(st.proj[0].vx, st.proj[0].vy);
+  }
+  const s0 = ringShotSpeed('paleherald', 0), s1 = ringShotSpeed('paleherald', 1), s2 = ringShotSpeed('paleherald', 2);
+  check(`same ring leaves faster every phase (${s0.toFixed(1)} < ${s1.toFixed(1)} < ${s2.toFixed(1)} px/s)`,
+    s0 < s1 && s1 < s2 && Math.abs(s0 - 56) < 0.01 && Math.abs(s2 - 56 * 1.12) < 0.01);
+  // telegraph compression with the 0.5s floor: paleherald ring tele 0.65 -> 0.598 at phase 2
+  function teleTimer(bossId, phaseIdx) {
+    const st = PIT.createRun({ boss: bossId, charId: 'volt', seed: 77 });
+    st.boss.phase = phaseIdx;
+    st.boss.rt = { mode: 'gap', timer: 0.001, pat: null, patIdx: 1 }; // patIdx 1: same 0.6s tele in both probed phases
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    return st.boss.rt.timer;
+  }
+  const t0 = teleTimer('paleherald', 0), t2 = teleTimer('paleherald', 2);
+  // formula-driven pin: whatever pattern each phase picks, the engine must apply
+  // max(0.5, dataTele x AGGRO.tele[phase]) — compression with the fairness floor
+  function teleProbe(bossId, phaseIdx) {
+    const st = PIT.createRun({ boss: bossId, charId: 'volt', seed: 77 });
+    st.boss.phase = phaseIdx;
+    st.boss.rt = { mode: 'gap', timer: 0.001, pat: null, patIdx: 1 };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const idx = st.boss.rt.patIdx;
+    return { timer: st.boss.rt.timer, dataTele: st.bossDef.phases[phaseIdx].patterns[idx].tele };
+  }
+  const a = teleProbe('paleherald', 0), b = teleProbe('paleherald', 2);
+  check(`telegraphs snap a beat tighter every phase (${t0.toFixed(3)} -> ${t2.toFixed(3)}s, curve applied exactly)`,
+    Math.abs(a.timer - Math.max(0.5, a.dataTele * PIT.AGGRO.tele[0])) < 0.001 &&
+    Math.abs(b.timer - Math.max(0.5, b.dataTele * PIT.AGGRO.tele[2])) < 0.001 && b.timer < a.timer);
+  const tFloor = teleTimer('tideunbound', 3); // data tele 0.55 x 0.88 = 0.484 -> the 0.5s floor catches it
+  check('tele compression never breaks the 0.5s fairness floor', Math.abs(tFloor - 0.5) < 0.001);
+  // recover compresses with the same gap curve
+  {
+    const st = PIT.createRun({ boss: 'paleherald', charId: 'volt', seed: 77 });
+    st.boss.phase = 2;
+    const pat = st.bossDef.phases[2].patterns[0];
+    st.boss.rt = { mode: 'active', timer: 0.001, pat, patIdx: 0, data: {}, spawned: 0, sub: 0 };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    check('recover time compresses on the fury gap curve (0.25 -> 0.2125)', Math.abs(st.boss.rt.timer - 0.25 * 0.85) < 0.001);
+  }
+  // THE BURST: a phase transition answers with a gold retaliation ring out of the wipe
+  {
+    const st = PIT.createRun({ boss: 'gatekeeper', charId: 'volt', seed: 5 });
+    st.player.invuln = 0; st.player.dashI = 0;
+    st.proj.push({ x: st.player.x, y: st.player.y, vx: 10, vy: 0, r: 3, kind: 'shot' }); // a live bullet to wipe
+    st.boss.hp = Math.round(st.boss.maxHp * 0.49); // under the phase-2 threshold (0.5)
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const oldGone = !st.proj.some(q => q.kind === 'shot');
+    const burst = st.proj.filter(q => q.kind === 'phase');
+    const spd = Math.hypot(burst[0].vx, burst[0].vy);
+    check('phase transition wipes the old bullets AND fires a burst ring', oldGone && burst.length === 14);
+    check('burst ring is gold-tagged, slower than a run (50 < 68 px/s), radial',
+      Math.abs(spd - 50) < 0.01 && burst.every(q => Math.abs(Math.hypot(q.vx, q.vy) - 50) < 0.01) &&
+      st.events.some(e => e.type === 'phase' && e.burst === 14));
+  }
+  // skipping two thresholds in one step: every transition wipes the previous ring and
+  // fires its own (fairness wipe per transition), so the FINAL ring is what survives
+  {
+    const st = PIT.createRun({ boss: 'tideunbound', charId: 'volt', seed: 5 });
+    st.boss.hp = Math.round(st.boss.maxHp * 0.2); // straight to the final phase
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const bursts = st.events.filter(e => e.type === 'phase').map(e => e.burst);
+    check('multi-phase skip fires one ring per transition (14, 16, 18) and lands at phase 4',
+      JSON.stringify(bursts) === JSON.stringify([14, 16, 18]) && st.boss.phase === 3);
+    check('each transition wipes the previous ring — the final ring survives alone (18 bullets)',
+      st.proj.length === 18 && st.proj.every(q => q.kind === 'phase'));
+  }
+  // the ring is always walkable, at every rank, in every phase: no multipliers on its speed
+  check('burst ring speed never reaches run speed (46 + 4/phase < 68)',
+    [0, 1, 2, 3].every(i => 46 + 4 * i < CHARS.LIST[0].speed));
+}
 
 // ================= rules =================
 console.log('--- Rules ---');
@@ -473,7 +569,7 @@ console.log('--- Dodge-bot: gold band at the GOLD preset (VOLT) — the tax coll
     check(`${b.name} cleared 3/3 at GOLD preset (${details.join(' ')})`, wins === 3);
   }
 }
-console.log('--- Dodge-bot: beyond band at base (BULWARK, the siege frame) — 8 bosses, one exclusive pair per rank ---');
+console.log('--- Dodge-bot: beyond band at base (BULWARK, the siege frame) — 12 bosses, one exclusive trio per rank ---');
 {
   for (const { b, i } of bandBosses('beyond')) {
     let wins = 0;
@@ -544,20 +640,24 @@ console.log('--- Fairness probes ---');
   check(`pools only go live after their outline (saw ${poolsSeen} pools)`, ok && poolsSeen > 0);
 }
 {
-  // phase transitions wipe live hazards (fairness breather)
+  // PHASE FURY reworked this probe: the wipe still happens (every pre-transition bullet
+  // object is gone), and the transition itself now answers with a gold burst ring — the
+  // new fairness contract is "clean screen, then one walkable ring", not "empty screen".
   const st = PIT.createRun({ boss: 0, charId: 'volt', seed: 5 });
   const dt = 1 / 60;
-  let sawWipe = false, lastPhase = 0;
+  let wipedAll = false, burstSeen = false, lastPhase = 0;
   for (let i = 0; i < 60 * 240 && !st.over; i++) {
-    const nProj = st.proj.length;
+    const before = st.proj.slice(); // object references
     PIT.step(st, dt, botInput(st));
     if (st.boss.phase > lastPhase) {
       lastPhase = st.boss.phase;
-      if (nProj > 0 && st.proj.length === 0) sawWipe = true;
+      wipedAll = before.length > 0 && before.every(q => !st.proj.includes(q));
+      burstSeen = st.proj.length > 0 && st.proj.every(q => q.kind === 'phase');
       break;
     }
   }
-  check('phase transition wipes live projectiles', sawWipe);
+  check('phase transition wipes every live projectile (by reference)', wipedAll);
+  check('the wipe ends with the gold burst ring on a clean screen', burstSeen);
 }
 
 // ================= fuzz =================
@@ -575,7 +675,7 @@ console.log('--- Fuzz ---');
       }
     }
   } catch (e) { crashed = true; }
-  check('random-input fuzz across all 21 bosses: no crash', !crashed);
+  check('random-input fuzz across all 26 bosses: no crash', !crashed);
 }
 
 // ================= house guards =================
@@ -586,8 +686,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.11', APP.includes("const BUILD = '2026.11.11'"));
-  check('app.js update log leads with ARENA POOLS', APP.includes("tag: 'ARENA POOLS'") && APP.indexOf("tag: 'ARENA POOLS'") < APP.indexOf("tag: 'BOSS EXPANSION'"));
+  check('app.js pins BUILD 2026.11.12', APP.includes("const BUILD = '2026.11.12'"));
+  check('app.js update log leads with PHASE FURY', APP.includes("tag: 'PHASE FURY'") && APP.indexOf("tag: 'PHASE FURY'") < APP.indexOf("tag: 'ARENA POOLS'"));
+  check('app.js logs the ARENA POOLS entry', APP.includes("tag: 'ARENA POOLS'"));
   check('app.js logs the BOSS EXPANSION entry', APP.includes("tag: 'BOSS EXPANSION'"));
   check('app.js logs the RANKED BETA entry', APP.includes("tag: 'RANKED BETA'"));
   check('app.js logs the ABILITY HOTFIX entry', APP.includes("tag: 'ABILITY HOTFIX'"));
@@ -596,17 +697,19 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.11 // ARENA POOLS', IDX.includes('BUILD 2026.11.11 // CORE BREACH: PIT — ARENA POOLS'));
+  check('index.html footer stamps BUILD 2026.11.12 // PHASE FURY', IDX.includes('BUILD 2026.11.12 // CORE BREACH: PIT — PHASE FURY'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110g', busts.length === 7 && busts.every(t => t === '?v=20261110g'), busts.join(','));
+  check('all 7 asset tags bust at 20261110h', busts.length === 7 && busts.every(t => t === '?v=20261110h'), busts.join(','));
   check('engine hurt() honors PHASE intangibility', ENG.includes('if (p.phase > 0) return false;'));
+  check('engine carries the PHASE FURY aggression curve and burst ring', ENG.includes('const AGGRO') && ENG.includes("kind: 'phase'") && ENG.includes('aggroAt('));
   check('engine has no arena-progression references left', !ENG.includes('ARENAS'));
   check('styles.css forces [hidden] display:none !important (overlays respect hidden)', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(CSS));
   check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));
   check('hub renders the ranked card, ladder, Top 5 and arena roster', IDX.includes('id="rank-card"') && IDX.includes('id="rank-ladder"') && IDX.includes('id="top5"') && IDX.includes('id="roster"'));
   check('app.js draws every boss in the roster',
     ['gatekeeper', 'bilespitter', 'gnasher', 'cindermite', 'thresher', 'surgeon', 'hive', 'paleherald', 'gloamwarden', 'carrionlaw',
-     'tollmaster', 'brassherald', 'gravewake', 'ironchoir', 'theloom', 'fathom', 'maelstrom', 'nullsovereign', 'theglutton', 'tideunbound']
+     'brassherald', 'theauditor', 'tollmaster', 'gravewake', 'cindermaw', 'ironchoir', 'theloom', 'dredgewarden', 'fathom', 'maelstrom',
+     'goreprelate', 'nullsovereign', 'theglutton', 'oldwater', 'tideunbound']
       .every(id => APP.includes(`case '${id}'`)));
 }
 

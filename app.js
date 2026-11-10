@@ -1,8 +1,14 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.11';
+  const BUILD = '2026.11.12';
   const UPDATE_LOG = [
+    { version: '2026.11.12', tag: 'PHASE FURY', items: [
+      'BOSS PHASES NOW ACTUALLY DO SOMETHING (owner spec): every phase the whole fight escalates — patterns cycle sooner, telegraphs snap a beat tighter (never under the 0.5s fairness floor) and every projectile leaves faster. Enrage final phases stack on top of the curve and hit harder than ever',
+      'PHASE TRANSITIONS FIGHT BACK: the fairness wipe now ends with a gold retaliation ring bursting out of the boss — slower than your run speed, so walk through it, but it will catch you standing still',
+      'THE POOLS DEEPEN (owner spec: "an extra boss or two"): five arenas get a third boss — THE AUDITOR joins the gold tax office, CINDERMAW the platinum gate, DREDGEWARDEN the diamond deep, GORE PRELATE the crimson court, OLD WATER (four phases) the iridescent endgame. Roster 21 -> 26, no arena rolls fewer than three bodies',
+      'Every new boss is bot-proven: THE AUDITOR at the GOLD preset (VOLT 3/3 seeds), the four new beyond bosses at base (BULWARK 3/3 seeds each); every existing gate re-proven under the fury curve'
+    ] },
     { version: '2026.11.11', tag: 'ARENA POOLS', items: [
       'EVERY ARENA ROLLS ITS OWN BOSS POOL (owner spec) — no more shared rotation: GOLD fights the Tide\'s tax collectors, PLATINUM owns GRAVEWAKE + IRON CHOIR, DIAMOND owns THE LOOM + THE FATHOM, CRIMSON owns MAELSTROM + NULL SOVEREIGN, IRIDESCENT owns THE GLUTTON + TIDE UNBOUND. No boss appears in two arenas — a test pins the ownership',
       'THE ROSTER GROWS 15 -> 21: TOLLMASTER (545) and BRASS HERALD (570) fill the new gold band, strictly past the DEATHWARRANT anchor; THE LOOM (620), MAELSTROM (650), THE GLUTTON (680) and TIDE UNBOUND (720, 4 enrage phases) deepen the beyond band',
@@ -183,7 +189,7 @@
   const cv = $('#fight-canvas'), cx = cv.getContext('2d');
   cx.imageSmoothingEnabled = false;
   const STEP = 1 / 60;
-  let st = null, acc = 0, last = 0, running = false, paused = false, overT = 0;
+  let st = null, acc = 0, last = 0, running = false, paused = false, overT = 0, flashT = 0;
   const keys = {};
   let particles = [];
 
@@ -198,7 +204,7 @@
   function startFight(bossIndex, rk) {
     rk = rk || PIT.rankFor(SAVE.sr);
     st = PIT.createRun({ boss: bossIndex, charId: SAVE.char, seed: (Date.now() & 0xffffff) >>> 0, mods: PIT.rankMods(rk) });
-    particles = []; acc = 0; overT = 0; paused = false;
+    particles = []; acc = 0; overT = 0; paused = false; flashT = 0;
     SAVE.runs++; persist();
     show('fight');
     $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${st.mods.hpMult} GAP ×${st.mods.gapMult}`;
@@ -304,7 +310,7 @@
       if (ev.type === 'dash') burst(ev.x, ev.y, C.teal, 6);
       if (ev.type === 'block') burst(ev.x, ev.y, C.gold, 5);
       if (ev.type === 'win') burst(st.boss.x, st.boss.y, C.amber, 40);
-      if (ev.type === 'phase') burst(st.boss.x, st.boss.y, C.crimson, 24);
+      if (ev.type === 'phase') { burst(st.boss.x, st.boss.y, C.gold, 34); flashT = 0.35; }
     }
     st.events.length = 0;
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -326,6 +332,14 @@
 
   function render() {
     cx.fillStyle = C.bg; cx.fillRect(0, 0, PIT.W, PIT.H);
+    // PHASE FURY: the whole frame flashes gold for a beat when a boss phase lands
+    if (flashT > 0) {
+      flashT -= 1 / 60;
+      cx.globalAlpha = Math.max(0, flashT) * 0.55;
+      cx.fillStyle = C.gold;
+      cx.fillRect(0, 0, PIT.W, PIT.H);
+      cx.globalAlpha = 1;
+    }
 
     // arena floor + grid
     cx.fillStyle = C.void; cx.fillRect(PIT.AR.x0, PIT.AR.y0, PIT.AR.x1 - PIT.AR.x0, PIT.AR.y1 - PIT.AR.y0);
@@ -377,8 +391,8 @@
       cx.restore();
     }
 
-    // projectiles
-    for (const q of st.proj) px(q.x - q.r, q.y - q.r, q.r * 2, q.r * 2, C.crimlite);
+    // projectiles — phase-ring bullets are gold so the retaliation ring reads instantly
+    for (const q of st.proj) px(q.x - q.r, q.y - q.r, q.r * 2, q.r * 2, q.kind === 'phase' ? C.gold : C.crimlite);
 
     // minions
     for (const m of st.minions) {
@@ -482,6 +496,11 @@
         px(x - r - 1, y - r + 3, 2, r * 2 - 6, flash ? C.white : C.gray);
         px(x + r - 1, y - r + 3, 2, r * 2 - 6, flash ? C.white : C.gray); // organ pipes
         px(x - 2, y - 2, 4, 4, flash ? C.white : C.gold); break;
+      case 'dredgewarden':
+        px(x - r + 1, y - r, r * 2 - 2, r * 2, tint);
+        px(x - r - 2, y - 3, 4, 2, flash ? C.white : C.tealite); px(x + r - 2, y - 3, 4, 2, flash ? C.white : C.tealite); // claw arms
+        px(x - r + 2, y + 2, r * 2 - 4, 2, dark); // dredge bar
+        px(x - 4, y - r + 1, 3, 3, flash ? C.white : C.void); px(x + 1, y - r + 1, 3, 3, flash ? C.white : C.void); break; // eyes
       case 'fathom':
         px(x - r + 3, y - r, r * 2 - 6, r * 2, tint);
         px(x - r, y - 2, r * 2, 4, dark);
@@ -490,6 +509,12 @@
         px(x - r, y - r + 1, r * 2, r * 2 - 2, tint);
         px(x - r + 2, y - r - 2, 4, 4, dark); px(x + r - 6, y - r - 2, 4, 4, dark); // split crown
         px(x - 4, y, 8, 3, flash ? C.white : C.void); px(x - 2, y - 4, 4, 2, flash ? C.white : C.crimlite); break;
+      case 'theauditor':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 2, y - 2, r * 2 - 4, 3, dark); // ledger lines
+        px(x - 1, y - r - 4, 2, 5, flash ? C.white : C.gold); // quill spike
+        px(x - 3, y - r + 1, 6, 2, flash ? C.white : C.gold); // stamp bar
+        px(x - 2, y - 1, 4, 3, flash ? C.white : C.void); break; // seal eye
       case 'tollmaster':
         px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
         px(x - r + 2, y - 1, r * 2 - 4, 4, dark); // coin slot belt
@@ -500,6 +525,11 @@
         px(x + r - 2, y - 4, 6, 8, flash ? C.white : C.gold); // flared horn bell
         px(x + r - 6, y - 2, 4, 4, dark);
         px(x - 4, y - r + 1, 3, 3, flash ? C.white : C.void); px(x + 1, y - r + 1, 3, 3, flash ? C.white : C.void); break; // eyes
+      case 'cindermaw':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 3, y - r - 3, 3, 5, dark); px(x + r - 6, y - r - 3, 3, 5, dark); // chimney stacks
+        px(x - r + 2, y - 1, r * 2 - 4, 5, flash ? C.white : C.void); // the maw
+        px(x - r + 3, y, 2, 3, flash ? C.white : '#ffcc66'); px(x + r - 5, y, 2, 3, flash ? C.white : '#ffcc66'); px(x - 1, y, 2, 3, flash ? C.white : '#ffcc66'); break; // furnace teeth
       case 'theloom':
         px(x - r + 2, y - r, r * 2 - 4, r * 2, tint); // loom frame
         px(x - 1, y - r - 3, 2, r * 2 + 6, flash ? C.white : C.gold); // the thread
@@ -509,10 +539,20 @@
         px(x - r, y - r, r * 2, r * 2, tint);
         px(x - r + 2, y - 1, r * 2 - 4, 2, dark); px(x - 1, y - r + 2, 2, r * 2 - 4, dark); // vortex cross
         px(x - 2, y - 2, 4, 4, flash ? C.white : C.tealite); px(x + r - 3, y - r + 1, 3, 3, flash ? C.white : C.tealite); px(x - r, y + r - 4, 3, 3, flash ? C.white : C.tealite); break; // the eye + swirl arms
+      case 'goreprelate':
+        px(x - r + 2, y - r + 2, r * 2 - 4, r * 2 - 2, tint); // the robe
+        px(x - 2, y - r - 4, 4, 6, flash ? C.white : C.gold); // mitre
+        px(x - r, y - 2, r * 2, 3, dark); // stole
+        px(x - 3, y - 1, 6, 3, flash ? C.white : C.void); px(x - 1, y, 2, 2, C.crimson); break; // hood shadow
       case 'theglutton':
         px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
         px(x - r + 2, y - 2, r * 2 - 4, 6, flash ? C.white : C.void); // the maw
         px(x - r + 3, y - 1, 2, 3, C.gold); px(x - 1, y - 1, 2, 3, C.gold); px(x + r - 5, y - 1, 2, 3, C.gold); break; // teeth
+      case 'oldwater':
+        px(x - r, y - r + 1, r * 2, r * 2 - 2, tint);
+        px(x - r, y - r - 2, r * 2, 3, flash ? C.white : C.white); // the pale crest
+        px(x - r + 2, y - 2, r * 2 - 4, 4, flash ? C.white : C.void); // the hollow
+        px(x - 4, y - 1, 2, 2, C.tealite); px(x + 2, y - 1, 2, 2, C.tealite); px(x - r + 3, y + 2, 3, 2, C.tealite); px(x + r - 6, y + 2, 3, 2, C.tealite); break; // drowned eyes
       case 'tideunbound':
         px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
         px(x - r, y - r - 1, r * 2, 3, flash ? C.white : C.white); // the crest
@@ -574,7 +614,7 @@
     px(abx, 18, Math.round(26 * (1 - p.abCd / st.char.abCd)), 3, abReady ? C.gold : C.amber);
     cx.textAlign = 'right';
     cx.fillStyle = st.bossDef.phases[st.boss.phase].enrage ? C.crimlite : C.gray;
-    cx.fillText(`PHASE ${st.boss.phase + 1}/${st.bossDef.phases.length} · HITS ${st.hitsTaken}`, PIT.W - 6, 17);
+    cx.fillText(`PHASE ${st.boss.phase + 1}/${st.bossDef.phases.length}${st.bossDef.phases[st.boss.phase].enrage ? ' — ANGRY' : ''} · HITS ${st.hitsTaken}`, PIT.W - 6, 17);
     cx.textAlign = 'left';
   }
 
