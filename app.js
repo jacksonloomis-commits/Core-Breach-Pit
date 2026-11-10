@@ -3,6 +3,12 @@
   'use strict';
   const BUILD = '2026.11.11';
   const UPDATE_LOG = [
+    { version: '2026.11.11', tag: 'ARENA POOLS', items: [
+      'EVERY ARENA ROLLS ITS OWN BOSS POOL (owner spec) — no more shared rotation: GOLD fights the Tide\'s tax collectors, PLATINUM owns GRAVEWAKE + IRON CHOIR, DIAMOND owns THE LOOM + THE FATHOM, CRIMSON owns MAELSTROM + NULL SOVEREIGN, IRIDESCENT owns THE GLUTTON + TIDE UNBOUND. No boss appears in two arenas — a test pins the ownership',
+      'THE ROSTER GROWS 15 -> 21: TOLLMASTER (545) and BRASS HERALD (570) fill the new gold band, strictly past the DEATHWARRANT anchor; THE LOOM (620), MAELSTROM (650), THE GLUTTON (680) and TIDE UNBOUND (720, 4 enrage phases) deepen the beyond band',
+      'The hub roster is now the ARENA roster: seven sections, one per rank, each listing exactly the bosses that can spawn there',
+      'Every new boss is bot-proven: the gold band at the GOLD preset (VOLT 3/3 seeds each), the four new beyond bosses at base (BULWARK 3/3 seeds each)'
+    ] },
     { version: '2026.11.11', tag: 'BOSS EXPANSION', items: [
       'THE ROSTER GOES 5 -> 15: ten new Crimson Tide lieutenants across three difficulty bands — GNASHER, CINDERMITE, THRESHER (bronze), PALE HERALD, GLOAMWARDEN, CARRION LAW (silver), IRON CHOIR, THE FATHOM, GRAVEWAKE, NULL SOVEREIGN (beyond)',
       'Silver recalibrated (owner spec): silver-rank rolls are now ALL champion-weight — THE SURGEON (280 -> 500) and HIVE MOTHER (440 -> 480) were rebuilt into the DEATHWARRANT area, and every silver pool member is pinned to 480-560 base HP by tests',
@@ -136,18 +142,25 @@
 
     $('#hub-stats').textContent = `RUNS ${SAVE.runs} · ${SAVE.wins}W ${SAVE.losses}L · PEAK ${SAVE.peakSr} SR · SEASON ${PIT.SEASON}`;
 
-    // the roster — all fifteen lieutenants of the Tide, grouped by weight class
+    // the roster — the ARENA roster: every rank owns its pool, and the pool IS the
+    // section (owner spec: "each arena should have its own boss pool"). Pools are
+    // exclusive, so every boss appears exactly once, under the only rank that rolls it.
     const roster = $('#roster'); roster.innerHTML = '';
-    const BANDS = [
-      { key: 'bronze', label: 'BRONZE WEIGHT — THE WARM-UP' },
-      { key: 'silver', label: 'SILVER WEIGHT — THE DEATHWARRANT AREA' },
-      { key: 'beyond', label: 'BEYOND THE CHAMPION' }
+    const ARENAS = [
+      { name: 'BRONZE', label: 'BRONZE ARENA — THE WARM-UP' },
+      { name: 'SILVER', label: 'SILVER ARENA — THE DEATHWARRANT AREA' },
+      { name: 'GOLD', label: 'GOLD ARENA — THE TIDE\'S TAX COLLECTORS' },
+      { name: 'PLATINUM', label: 'PLATINUM ARENA — FIRST GATE PAST THE CHAMPION' },
+      { name: 'DIAMOND', label: 'DIAMOND ARENA — THE DEEP PRESSURE' },
+      { name: 'CRIMSON', label: 'CRIMSON ARENA — THE KING\'S COURT' },
+      { name: 'IRIDESCENT', label: 'IRIDESCENT ARENA — THE TIDE ITSELF' }
     ];
-    for (const band of BANDS) {
-      const head = el('div', 'roster-band', band.label);
+    for (const arena of ARENAS) {
+      const rk = PIT.RANKS.find(r => r.name === arena.name);
+      const head = el('div', 'roster-band', arena.label + ' — POOL: ' + rk.pool.map(i => BOSSES.LIST[i].name).join(' · '));
       roster.appendChild(head);
-      BOSSES.LIST.forEach((b) => {
-        if (b.band !== band.key) return;
+      rk.pool.forEach((bi) => {
+        const b = BOSSES.LIST[bi];
         const card = el('div', 'roster-boss');
         card.innerHTML = `<span class="rb-name" style="color:${b.tint}">${b.name}</span><span class="rb-title">${b.title}</span><span class="rb-hp">${b.hp} HP</span><div class="rb-brief">${b.brief}</div>`;
         roster.appendChild(card);
@@ -477,6 +490,35 @@
         px(x - r, y - r + 1, r * 2, r * 2 - 2, tint);
         px(x - r + 2, y - r - 2, 4, 4, dark); px(x + r - 6, y - r - 2, 4, 4, dark); // split crown
         px(x - 4, y, 8, 3, flash ? C.white : C.void); px(x - 2, y - 4, 4, 2, flash ? C.white : C.crimlite); break;
+      case 'tollmaster':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 2, y - 1, r * 2 - 4, 4, dark); // coin slot belt
+        px(x - 4, y - r + 1, 8, 3, flash ? C.white : C.gold); px(x - 2, y - r - 3, 4, 3, flash ? C.white : C.gold); // toll standard
+        px(x - 2, y - 1, 4, 3, flash ? C.white : C.void); break; // slot eye
+      case 'brassherald':
+        px(x - r + 1, y - r + 2, r * 2 - 2, r * 2 - 2, tint);
+        px(x + r - 2, y - 4, 6, 8, flash ? C.white : C.gold); // flared horn bell
+        px(x + r - 6, y - 2, 4, 4, dark);
+        px(x - 4, y - r + 1, 3, 3, flash ? C.white : C.void); px(x + 1, y - r + 1, 3, 3, flash ? C.white : C.void); break; // eyes
+      case 'theloom':
+        px(x - r + 2, y - r, r * 2 - 4, r * 2, tint); // loom frame
+        px(x - 1, y - r - 3, 2, r * 2 + 6, flash ? C.white : C.gold); // the thread
+        px(x - r, y - 3, r * 2, 2, dark); px(x - r, y + 3, r * 2, 2, dark); // weave bars
+        px(x - 3, y - 1, 6, 3, flash ? C.white : C.void); break;
+      case 'maelstrom':
+        px(x - r, y - r, r * 2, r * 2, tint);
+        px(x - r + 2, y - 1, r * 2 - 4, 2, dark); px(x - 1, y - r + 2, 2, r * 2 - 4, dark); // vortex cross
+        px(x - 2, y - 2, 4, 4, flash ? C.white : C.tealite); px(x + r - 3, y - r + 1, 3, 3, flash ? C.white : C.tealite); px(x - r, y + r - 4, 3, 3, flash ? C.white : C.tealite); break; // the eye + swirl arms
+      case 'theglutton':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 2, y - 2, r * 2 - 4, 6, flash ? C.white : C.void); // the maw
+        px(x - r + 3, y - 1, 2, 3, C.gold); px(x - 1, y - 1, 2, 3, C.gold); px(x + r - 5, y - 1, 2, 3, C.gold); break; // teeth
+      case 'tideunbound':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r, y - r - 1, r * 2, 3, flash ? C.white : C.white); // the crest
+        px(x - r + 3, y - r + 3, 4, 3, C.gold); px(x + r - 7, y - r + 3, 4, 3, C.gold); px(x - 2, y - r + 4, 4, 3, C.gold); // tide crown
+        px(x - 5, y - 2, 10, 5, flash ? C.white : C.crimdark);
+        px(x - 3, y - 1, 2, 2, C.crimson); px(x + 1, y - 1, 2, 2, C.crimson); break;
       case 'nullsovereign':
         px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
         px(x - r + 1, y - r - 3, 3, 5, C.gold); px(x + r - 4, y - r - 3, 3, 5, C.gold); px(x - 2, y - r - 4, 4, 6, C.gold); // triple crown

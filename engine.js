@@ -441,14 +441,22 @@
     IRIDESCENT: { hpMult: 2.0, gapMult: 0.7 }
   };
 
-  // Boss pools (owner spec, BOSS EXPANSION): indices into bosses.js LIST.
-  //   bronze band [0-4]   — the easy warm-up, unchanged feel ("super ez" by design)
-  //   silver band [5-10]  — THE DEATHWARRANT AREA: champion-weight bosses; every roll
-  //                         is bot-proven 3/3 at the SILVER preset
-  //   beyond band [11-14] — past the champion, platinum+ only
-  // Bot gates: every boss is proven at BASE and the bronze+silver ladder presets 3/3.
-  // PLATINUM+ presets are the designed beyond-bot wall — humans outplay the bot there
-  // (see AGENTS.md; the suite survival-gates them instead of demanding full clears).
+  // Boss pools (owner spec, ARENA POOLS): indices into bosses.js LIST.
+  // "Each arena should have its own boss pool" — every rank now OWNS an exclusive
+  // pool; no boss rolls in two arenas:
+  //   BRONZE    [0-4]    the bronze band, unchanged ("super ez" by design)
+  //   SILVER    [5-10]   THE DEATHWARRANT AREA, champion weight
+  //   GOLD      [11,12]  the gold band — the Tide's tax collectors
+  //   PLATINUM  [13,14]  gravewake + ironchoir (the first gate past the champion)
+  //   DIAMOND   [15,16]  theloom + fathom
+  //   CRIMSON   [17,18]  maelstrom + nullsovereign
+  //   IRIDESCENT [19,20] theglutton + tideunbound (the Tide itself)
+  // A suite test pins OWNERSHIP: the seven pools are pairwise disjoint and their
+  // union is the entire 21-boss roster. Bot gates: every boss is proven at its
+  // rank preset where VOLT can live there (bronze/silver/gold 3/3) and at base
+  // for the beyond band (BULWARK 3/3). PLATINUM+ presets remain the designed
+  // beyond-bot wall — humans outplay the bot there (see AGENTS.md; the suite
+  // survival-gates them instead of demanding full clears).
   const RANKS = [
     { name: 'BRONZE', tier: 1, min: 0, max: 200, pool: [0, 1, 2, 3, 4] },
     { name: 'BRONZE', tier: 2, min: 200, max: 300, pool: [0, 1, 2, 3, 4] },
@@ -456,18 +464,18 @@
     { name: 'SILVER', tier: 1, min: 500, max: 600, pool: [5, 6, 7, 8, 9, 10] },
     { name: 'SILVER', tier: 2, min: 600, max: 700, pool: [5, 6, 7, 8, 9, 10] },
     { name: 'SILVER', tier: 3, min: 700, max: 800, pool: [5, 6, 7, 8, 9, 10] },
-    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [8, 9, 10, 11] },
-    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [8, 9, 10, 11] },
-    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [11, 12, 13] },
-    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [11, 12, 13] },
-    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [11, 12, 13] },
-    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [11, 12, 13] },
-    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [11, 12, 13] },
-    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [11, 12, 13] },
-    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [12, 13, 14] },
-    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [12, 13, 14] },
-    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [12, 13, 14] },
-    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [13, 14] }
+    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [11, 12] },
+    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [11, 12] },
+    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [13, 14] },
+    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [13, 14] },
+    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [13, 14] },
+    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [15, 16] },
+    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [15, 16] },
+    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [15, 16] },
+    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [17, 18] },
+    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [17, 18] },
+    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [17, 18] },
+    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [19, 20] }
   ];
 
   function rankFor(sr) {

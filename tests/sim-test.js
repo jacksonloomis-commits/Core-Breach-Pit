@@ -1,7 +1,8 @@
 // CORE BREACH: PIT — headless sim test suite.
-// The dodge-bot must beat the whole roster: VOLT proves the bronze + silver ladder at
-// their rank presets (silver IS the DEATHWARRANT area, owner spec), BULWARK proves the
-// beyond band at base. The dashless casual reference must clear the tutorial only.
+// The dodge-bot must beat the whole roster: VOLT proves the bronze + silver + gold
+// ladder at their rank presets (silver IS the DEATHWARRANT area, owner spec), BULWARK
+// proves the beyond band at base. Every arena owns an EXCLUSIVE pool (no boss rolls in
+// two arenas). The dashless casual reference must clear the tutorial only.
 const PIT = require('../engine.js');
 const BOSSES = require('../bosses.js');
 const CHARS = require('../chars.js');
@@ -128,17 +129,20 @@ function runFight(boss, charId, seed, capSec, opts = {}) {
 }
 
 // ================= data integrity =================
-console.log('--- Data integrity (BOSS EXPANSION) ---');
-check('15 bosses defined', BOSSES.LIST.length === 15, String(BOSSES.LIST.length));
-check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 15);
-check('bands: 5 bronze / 6 silver / 4 beyond',
-  bandBosses('bronze').length === 5 && bandBosses('silver').length === 6 && bandBosses('beyond').length === 4,
-  `${bandBosses('bronze').length}/${bandBosses('silver').length}/${bandBosses('beyond').length}`);
+console.log('--- Data integrity (ARENA POOLS) ---');
+check('21 bosses defined', BOSSES.LIST.length === 21, String(BOSSES.LIST.length));
+check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 21);
+check('bands: 5 bronze / 6 silver / 2 gold / 8 beyond',
+  bandBosses('bronze').length === 5 && bandBosses('silver').length === 6 &&
+  bandBosses('gold').length === 2 && bandBosses('beyond').length === 8,
+  `${bandBosses('bronze').length}/${bandBosses('silver').length}/${bandBosses('gold').length}/${bandBosses('beyond').length}`);
 check('every boss carries title, brief and tint', BOSSES.LIST.every(b => b.title && b.brief && b.tint && b.band));
 
-// band calibration (owner spec: bronze easy, silver = the DEATHWARRANT area, beyond past it)
+// band calibration (owner spec: bronze easy, silver = the DEATHWARRANT area, gold past
+// the anchor, beyond past everything)
 const bronzeHP = bandBosses('bronze').map(x => x.b.hp);
 const silverHP = bandBosses('silver').map(x => x.b.hp);
+const goldHP = bandBosses('gold').map(x => x.b.hp);
 const beyondHP = bandBosses('beyond').map(x => x.b.hp);
 check(`bronze band stays easy (max HP ${Math.max(...bronzeHP)} <= 300, 2 phases)`,
   Math.max(...bronzeHP) <= 300 && bandBosses('bronze').every(x => x.b.phases.length === 2));
@@ -146,8 +150,35 @@ check(`silver band is the DEATHWARRANT area (HP ${Math.min(...silverHP)}..${Math
   Math.min(...silverHP) >= 480 && Math.max(...silverHP) <= 560 && bandBosses('silver').every(x => x.b.phases.length === 3));
 check('DEATHWARRANT anchors the silver band (hp 520, present)',
   byId('deathwarrant') && byId('deathwarrant').hp === 520 && byId('deathwarrant').band === 'silver');
+check(`gold band sits strictly past the anchor and under the old gods (HP ${Math.min(...goldHP)}..${Math.max(...goldHP)}, 3 phases)`,
+  Math.min(...goldHP) > Math.max(...silverHP) && Math.max(...goldHP) < 600 &&
+  bandBosses('gold').every(x => x.b.phases.length === 3));
 check(`beyond band is past the champion (HP ${Math.min(...beyondHP)}..${Math.max(...beyondHP)}, all strictly above silver)`,
   Math.min(...beyondHP) > Math.max(...silverHP) && bandBosses('beyond').every(x => x.b.phases.length >= 3));
+
+// ARENA POOL OWNERSHIP (owner spec: "each arena should have its own boss pool")
+{
+  const names = [...new Set(PIT.RANKS.map(r => r.name))];
+  const pools = names.map(n => {
+    const p = [...new Set(PIT.RANKS.filter(r => r.name === n).flatMap(r => r.pool))];
+    return { n, p };
+  });
+  const union = pools.flatMap(x => x.p);
+  const disjoint = pools.every((a, i) => pools.every((b, j) => i >= j || a.p.every(i => !b.p.includes(i))));
+  check(`the ladder has 7 arenas, each owning a pool of >= 2 bosses (${names.join('/')})`,
+    names.length === 7 && pools.every(x => x.p.length >= 2), pools.map(x => `${x.n}:${x.p.length}`).join(' '));
+  check('no boss rolls in two arenas (pools pairwise disjoint)', disjoint);
+  check('the pools cover the whole roster (all 21 bosses reachable somewhere)',
+    new Set(union).size === 21 && union.length === 21, `union ${new Set(union).size}/21`);
+  const bandOf = { BRONZE: 'bronze', SILVER: 'silver', GOLD: 'gold' };
+  check('bronze/silver/gold arenas roll only their own band',
+    pools.filter(x => bandOf[x.n]).every(x => x.p.every(i => BOSSES.LIST[i].band === bandOf[x.n])));
+  check('platinum and above roll only the beyond band',
+    pools.filter(x => !bandOf[x.n]).every(x => x.p.every(i => BOSSES.LIST[i].band === 'beyond')));
+  const maxHP = pools.map(x => Math.max(...x.p.map(i => BOSSES.LIST[i].hp)));
+  check(`pool weight escalates arena by arena (max base HP ${maxHP.join(' < ')})`,
+    maxHP.every((h, i) => i === 0 || h > maxHP[i - 1]));
+}
 
 // old progression path is gone (ranked replaced it)
 check('ARENAS progression removed from the game', BOSSES.ARENAS === undefined && !PIT.BOSSES.ARENAS);
@@ -160,6 +191,8 @@ check('bronze ranks roll only the bronze band',
   PIT.RANKS.filter(r => r.name === 'BRONZE').every(r => r.pool.every(i => BOSSES.LIST[i].band === 'bronze')));
 check('silver ranks roll only the silver band (the DEATHWARRANT area)',
   PIT.RANKS.filter(r => r.name === 'SILVER').every(r => r.pool.every(i => BOSSES.LIST[i].band === 'silver')));
+check('gold ranks roll only the gold band',
+  PIT.RANKS.filter(r => r.name === 'GOLD').every(r => r.pool.every(i => BOSSES.LIST[i].band === 'gold')));
 check('platinum and above roll only the beyond band',
   PIT.RANKS.filter(r => ['PLATINUM', 'DIAMOND', 'CRIMSON', 'IRIDESCENT'].includes(r.name))
     .every(r => r.pool.every(i => BOSSES.LIST[i].band === 'beyond')));
@@ -426,7 +459,21 @@ console.log('--- Dodge-bot: silver band at the SILVER preset = the DEATHWARRANT 
     check(`${b.name} cleared 3/3 at SILVER preset (${details.join(' ')})`, wins === 3);
   }
 }
-console.log('--- Dodge-bot: beyond band at base (BULWARK, the siege frame) ---');
+console.log('--- Dodge-bot: gold band at the GOLD preset (VOLT) — the tax collectors ---');
+{
+  const mods = PIT.RANK_MODS.GOLD;
+  for (const { b, i } of bandBosses('gold')) {
+    let wins = 0;
+    const details = [];
+    for (const seed of [1, 2, 3]) {
+      const { st, time } = runFight(i, 'volt', seed, 300, { mods });
+      details.push(`${seed}:${st.over === 'win' ? 'WIN' : (st.over || 'timeout')}@${Math.round(time)}s,h${st.player.hearts}`);
+      if (st.over === 'win') wins++;
+    }
+    check(`${b.name} cleared 3/3 at GOLD preset (${details.join(' ')})`, wins === 3);
+  }
+}
+console.log('--- Dodge-bot: beyond band at base (BULWARK, the siege frame) — 8 bosses, one exclusive pair per rank ---');
 {
   for (const { b, i } of bandBosses('beyond')) {
     let wins = 0;
@@ -528,7 +575,7 @@ console.log('--- Fuzz ---');
       }
     }
   } catch (e) { crashed = true; }
-  check('random-input fuzz across all 15 bosses: no crash', !crashed);
+  check('random-input fuzz across all 21 bosses: no crash', !crashed);
 }
 
 // ================= house guards =================
@@ -540,7 +587,8 @@ console.log('--- House guards ---');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
   check('app.js pins BUILD 2026.11.11', APP.includes("const BUILD = '2026.11.11'"));
-  check('app.js update log leads with BOSS EXPANSION', APP.includes("tag: 'BOSS EXPANSION'"));
+  check('app.js update log leads with ARENA POOLS', APP.includes("tag: 'ARENA POOLS'") && APP.indexOf("tag: 'ARENA POOLS'") < APP.indexOf("tag: 'BOSS EXPANSION'"));
+  check('app.js logs the BOSS EXPANSION entry', APP.includes("tag: 'BOSS EXPANSION'"));
   check('app.js logs the RANKED BETA entry', APP.includes("tag: 'RANKED BETA'"));
   check('app.js logs the ABILITY HOTFIX entry', APP.includes("tag: 'ABILITY HOTFIX'"));
   check('app.js logs the BALANCE + UI PASS entry', APP.includes("tag: 'BALANCE + UI PASS'"));
@@ -548,15 +596,18 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.11 // CORE BREACH: PIT', IDX.includes('BUILD 2026.11.11 // CORE BREACH: PIT'));
+  check('index.html footer stamps BUILD 2026.11.11 // ARENA POOLS', IDX.includes('BUILD 2026.11.11 // CORE BREACH: PIT — ARENA POOLS'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110f', busts.length === 7 && busts.every(t => t === '?v=20261110f'), busts.join(','));
+  check('all 7 asset tags bust at 20261110g', busts.length === 7 && busts.every(t => t === '?v=20261110g'), busts.join(','));
   check('engine hurt() honors PHASE intangibility', ENG.includes('if (p.phase > 0) return false;'));
   check('engine has no arena-progression references left', !ENG.includes('ARENAS'));
   check('styles.css forces [hidden] display:none !important (overlays respect hidden)', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(CSS));
   check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));
-  check('hub renders the ranked card, ladder, Top 5 and roster', IDX.includes('id="rank-card"') && IDX.includes('id="rank-ladder"') && IDX.includes('id="top5"') && IDX.includes('id="roster"'));
-  check('app.js draws every boss in the roster', APP.includes("case 'nullsovereign'") && APP.includes("case 'gnasher'") && APP.includes("case 'ironchoir'"));
+  check('hub renders the ranked card, ladder, Top 5 and arena roster', IDX.includes('id="rank-card"') && IDX.includes('id="rank-ladder"') && IDX.includes('id="top5"') && IDX.includes('id="roster"'));
+  check('app.js draws every boss in the roster',
+    ['gatekeeper', 'bilespitter', 'gnasher', 'cindermite', 'thresher', 'surgeon', 'hive', 'paleherald', 'gloamwarden', 'carrionlaw',
+     'tollmaster', 'brassherald', 'gravewake', 'ironchoir', 'theloom', 'fathom', 'maelstrom', 'nullsovereign', 'theglutton', 'tideunbound']
+      .every(id => APP.includes(`case '${id}'`)));
 }
 
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
