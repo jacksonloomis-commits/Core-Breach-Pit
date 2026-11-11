@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CORE BREACH: PIT // Ranked Boss-Rush Arena</title>
-  <link rel="stylesheet" href="styles.css?v=20261110j">
+  <link rel="stylesheet" href="styles.css?v=20261110k">
 </head>
 <body>
   <div id="app">
@@ -44,7 +44,7 @@
             <p>Your gun fires at the nearest hostile automatically. You position, you dash, you survive.</p>
             <p>Every boss attack is <b>telegraphed</b> — gold flash, dashed lines, pool outlines. Nothing hurts you without warning. Dash THROUGH beams, not away from them.</p>
             <p><b>Phases make bosses angrier:</b> every phase they fire sooner and faster, and the transition itself answers with a gold ring — slower than your run, so keep moving.</p>
-            <p><b>Mutators:</b> every queue can roll house twists — FRAIL, SWIFT HORROR, SIEGE, HEATED AIR, BROOD BLIGHT, VOLATILE CORE, ADRENALINE, BOUNTY. Bronze mostly stays clean; the deep ranks stack two. Read the fight title, adapt, win — no two rounds play the same.</p>
+            <p><b>Mutators:</b> every queue can roll house twists — FRAIL, SWIFT HORROR, SIEGE, HEATED AIR, BROOD BLIGHT, VOLATILE CORE, ADRENALINE, BOUNTY. Bronze mostly stays clean; the deep ranks stack two. Each round opens with a countdown that names the boss and every mutator with what it does — read it, then FIGHT. No two rounds play the same.</p>
             <p><b>Ranked:</b> each queue rolls a random boss from your rank's pool. Wins bank SR by the hearts you keep; flatlining costs SR. Higher ranks send the same lieutenants with more HP and tighter pacing — Silver walls you with the <b>DEATHWARRANT weight class</b>. GHOST unlocks at Silver (500 SR), BULWARK at Platinum (1100 SR).</p>
           </div>
           <h2 class="sect">OPTIONS</h2>
@@ -74,19 +74,26 @@
               <button id="btn-quit" class="btn ghost">QUIT TO HUB</button>
             </div>
           </div>
+          <div id="ready-ov" class="result-ov ready-ov" hidden>
+            <div id="ready-rank" class="r-rank"></div>
+            <div id="ready-boss" class="r-boss"></div>
+            <div id="ready-brief" class="r-brief"></div>
+            <div id="ready-muts" class="r-muts"></div>
+            <div id="ready-num" class="rnum">5</div>
+          </div>
         </div>
         <p class="fight-hint">WASD move · SPACE dash · E ability · P pause</p>
       </div>
     </section>
   </div>
 
-  <footer id="build-foot">BUILD 2026.11.14 // CORE BREACH: PIT — ROUND VARIETY</footer>
+  <footer id="build-foot">BUILD 2026.11.15 // CORE BREACH: PIT — ROUND ANNOUNCER</footer>
 
-  <script src="palette.js?v=20261110j"></script>
-  <script src="chars.js?v=20261110j"></script>
-  <script src="bosses.js?v=20261110j"></script>
-  <script src="engine.js?v=20261110j"></script>
-  <script src="audio.js?v=20261110j"></script>
-  <script src="app.js?v=20261110j"></script>
+  <script src="palette.js?v=20261110k"></script>
+  <script src="chars.js?v=20261110k"></script>
+  <script src="bosses.js?v=20261110k"></script>
+  <script src="engine.js?v=20261110k"></script>
+  <script src="audio.js?v=20261110k"></script>
+  <script src="app.js?v=20261110k"></script>
 </body>
 </html>

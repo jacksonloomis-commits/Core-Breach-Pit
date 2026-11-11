@@ -178,6 +178,19 @@ body.no-crt::after { display: none; }
 .banner { color: var(--gold); font-size: 13px; letter-spacing: 0.15em; border: 1px dashed var(--amber); padding: 6px 14px; animation: starpop 0.4s ease-out; }
 .result-btns { display: flex; gap: 12px; margin-top: 8px; }
 
+/* ---------- ROUND ANNOUNCER (pre-round countdown) ---------- */
+.ready-ov { gap: 8px; }
+.ready-ov .r-rank { color: var(--gray); font-size: 11px; letter-spacing: 0.3em; }
+.ready-ov .r-boss { font-size: 26px; letter-spacing: 0.14em; text-shadow: 3px 3px 0 #05070d; }
+.ready-ov .r-brief { color: var(--gray); font-size: 11px; }
+.ready-ov .r-muts { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
+.rmut { display: flex; flex-direction: column; gap: 2px; border: 1px dashed var(--amber); padding: 5px 14px; max-width: 92%; }
+.rmut-name { color: var(--gold); font-size: 12px; letter-spacing: 0.2em; }
+.rmut-blurb { color: var(--white); font-size: 11px; }
+.rmut-none { border-style: solid; border-color: var(--wall); }
+.rnum { font-size: 46px; line-height: 1; color: var(--white); text-shadow: 3px 3px 0 #05070d; }
+.rnum.pop { animation: starpop 0.3s ease-out; }
+
 /* ---------- footer ---------- */
 #build-foot {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;

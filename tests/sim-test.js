@@ -412,6 +412,22 @@ console.log('--- Round variety: mutators ---');
     const s3 = PIT.defaultRankedSave();
     check('no mutators: payout unchanged (+30)', PIT.applyRankedResult(s3, true, 0).delta === 30);
   }
+  // display formatting (owner report: composed multipliers printed float garbage
+  // like 1.0999000000099999) — fmtMul is the sanctioned path for every UI multiplier
+  check('fmtMul rounds the float garbage away (1.0999000000099999 -> "1.1")',
+    PIT.fmtMul(1.0999000000099999) === '1.1');
+  check('fmtMul keeps honest precision (0.9720000000000001 -> "0.972", 1.25 -> "1.25", 2 -> "2")',
+    PIT.fmtMul(0.9720000000000001) === '0.972' && PIT.fmtMul(1.25) === '1.25' && PIT.fmtMul(2) === '2');
+  {
+    // a live composed run must DISPLAY clean: every multiplier the title/announcer
+    // shows goes through fmtMul — short string, no float tails, honest to ±0.001
+    const st = PIT.createRun({ boss: 11, charId: 'volt', seed: 77, mods: PIT.RANK_MODS.GOLD, rankName: 'GOLD' });
+    const clean = ['hpMult', 'gapMult', 'projMult', 'speedMult'].every(k => {
+      const s = PIT.fmtMul(st.mods[k]);
+      return s.length <= 6 && Math.abs(parseFloat(s) - st.mods[k]) < 0.001;
+    });
+    check('composed multipliers of a live GOLD run render clean through fmtMul', clean);
+  }
   // every mutator keeps the tutorial endable and easy: GATEKEEPER 3/3 at BRONZE preset
   for (const m of PIT.MUTATORS) {
     let wins = 0; const det = [];
@@ -811,8 +827,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.14', APP.includes("const BUILD = '2026.11.14'"));
-  check('app.js update log leads with ROUND VARIETY', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
+  check('app.js pins BUILD 2026.11.15', APP.includes("const BUILD = '2026.11.15'"));
+  check('app.js update log leads with ROUND ANNOUNCER', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
+  check('app.js logs the ROUND VARIETY entry', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
   check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
   check('app.js logs the PHASE FURY entry', APP.includes("tag: 'PHASE FURY'"));
   check('app.js logs the ARENA POOLS entry', APP.includes("tag: 'ARENA POOLS'"));
@@ -824,9 +841,9 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.14 // ROUND VARIETY', IDX.includes('BUILD 2026.11.14 // CORE BREACH: PIT — ROUND VARIETY'));
+  check('index.html footer stamps BUILD 2026.11.15 // ROUND ANNOUNCER', IDX.includes('BUILD 2026.11.15 // CORE BREACH: PIT — ROUND ANNOUNCER'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110j', busts.length === 7 && busts.every(t => t === '?v=20261110j'), busts.join(','));
+  check('all 7 asset tags bust at 20261110k', busts.length === 7 && busts.every(t => t === '?v=20261110k'), busts.join(','));
   {
     // BROOD TAX data pin: the summon cadence law for the reported boss — the brood phase
     // keeps spawn at most 1-of-3 patterns with the swarm capped at 4.
@@ -842,8 +859,24 @@ console.log('--- House guards ---');
     ENG.includes('const MUTATORS') && ENG.includes('MUTATORS NEVER TOUCH SPAWN COUNTS OR CAPS') && ENG.includes('function rollMutators'));
   check('app.js renders the mutator draw in the fight title and results',
     APP.includes('rankName: rk.name') && APP.includes("'MUTATORS: '"));
-  check('startFight re-hides the result and pause overlays (no stale overlays over a fresh fight)',
-    APP.includes("$('#result').hidden = true;") && APP.includes("$('#pause-ov').hidden = true;"));
+  check('multipliers reach the UI only through fmtMul (no raw float interpolation in the title/ladder)',
+    APP.includes('PIT.fmtMul(st.mods.hpMult)') && APP.includes('PIT.fmtMul(st.mods.gapMult)') &&
+    APP.includes('PIT.fmtMul(mods.hpMult)') && APP.includes('PIT.fmtMul(mods.gapMult)') &&
+    !APP.includes('HP ×${st.mods.hpMult}'));
+  check('ROUND ANNOUNCER: pre-round countdown from 5 with boss name and mutator blurbs',
+    APP.includes('const READY_SECS = 5') && APP.includes("$('#ready-ov')") && APP.includes("$('#ready-num')") &&
+    APP.includes('showReady(rk)') && APP.includes('m.blurb') && APP.includes("PIT_SFX.sfx('count')") &&
+    APP.includes("PIT_SFX.sfx('go')"));
+  check('ROUND ANNOUNCER holds the sim frozen and gates input until the gates open',
+    APP.includes('if (readyT > -READY_GO) {') && APP.includes('paused || readyT > -READY_GO || !st'));
+  check('index.html carries the announcer overlay (rank line, boss name, mutator rows, big number)',
+    IDX.includes('id="ready-ov"') && IDX.includes('id="ready-rank"') && IDX.includes('id="ready-boss"') &&
+    IDX.includes('id="ready-muts"') && IDX.includes('id="ready-num"'));
+  check('styles.css styles the announcer (mutator rows, countdown number, pop beat)',
+    CSS.includes('.ready-ov') && CSS.includes('.rmut-blurb') && CSS.includes('.rnum.pop'));
+  check('startFight re-hides the result, pause and announcer overlays (no stale overlays over a fresh fight)',
+    APP.includes("$('#result').hidden = true;") && APP.includes("$('#pause-ov').hidden = true;") &&
+    APP.includes("$('#ready-ov').hidden = true;"));
   check('engine has no arena-progression references left', !ENG.includes('ARENAS'));
   check('styles.css forces [hidden] display:none !important (overlays respect hidden)', /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/.test(CSS));
   check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));

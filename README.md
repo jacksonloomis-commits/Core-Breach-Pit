@@ -39,6 +39,12 @@ Repetition is a design bug, so every queue can draw **mutators** — house twist
 
 Draw counts: bronze mostly stays clean (55% for one twist — the warm-up stays warm), silver always draws one, gold and platinum usually draw two, diamond and above always draw two. Effects compose multiplicatively with the rank presets. Two hard rules, enforced by tests: **mutators never touch spawn counts or swarm caps** (the summon-cadence law — a spawn stall stays impossible), and **BROOD BLIGHT only joins the deck if the rank's pool owns a summoner**. The tutorial is pinned winnable 3/3 against every single mutator.
 
+## The round announces itself — ROUND ANNOUNCER
+
+Every queue opens with a **five-second countdown** before the gates open: the rank, the boss's name and its HP at this pacing, and every mutator the roll drew — each with a one-line blurb saying exactly what it does — then **FIGHT**. The sim stays frozen while the announcer is up (nothing steps, nothing hurts, input is gated), and `P` still pauses it. Read the twist, plan the fight, then move.
+
+And no more floating-point garbage: composed multipliers (rank preset × mutator effects) used to print raw products like `1.0999000000099999`. Every multiplier the game shows — fight title, ladder rows, announcer — goes through `fmtMul` in `engine.js`, which rounds to three decimals and prints the shortest clean string (`1.1`, `0.972`, `1.25`).
+
 ## Boss phases get angry — PHASE FURY
 
 Phases are not a pattern swap. Every phase the whole fight escalates on one engine-side curve (`AGGRO` in `engine.js`): patterns cycle sooner (gaps and recover compress), telegraphs snap a beat tighter (never below the 0.5 s fairness floor), and **every projectile leaves faster**. Enrage final phases stack a last-stand multiplier on top of the curve. And the transition itself answers you: the fairness wipe ends with a **gold retaliation ring** bursting out of the boss — slower than your run speed, so you can walk through it, but it will catch you standing still.
@@ -89,6 +95,6 @@ Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, 
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.14 // ROUND VARIETY** (bust `20261110j`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.15 // ROUND ANNOUNCER** (bust `20261110k`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

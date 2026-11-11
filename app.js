@@ -1,8 +1,12 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.14';
+  const BUILD = '2026.11.15';
   const UPDATE_LOG = [
+    { version: '2026.11.15', tag: 'ROUND ANNOUNCER', items: [
+      'THE TWISTS MAKE THEIR ENTRANCE (owner spec): every queue now opens with a five-second countdown that names the boss and every mutator it rolled, with exactly what each one does — read the draw, plan the fight, then FIGHT',
+      'NO MORE 1.0999000000099999 (owner report): composed multipliers printed raw floating-point garbage. Every multiplier the game shows — fight title, ladder, announcer — is rounded clean now'
+    ] },
     { version: '2026.11.14', tag: 'ROUND VARIETY', items: [
       'MUTATORS (owner spec: make each round sorta unique and a little less tedious): every queue can now draw house twists alongside the boss — FRAIL, SWIFT HORROR, SIEGE, HEATED AIR, BROOD BLIGHT, VOLATILE CORE, ADRENALINE and BOUNTY. The fight title and the results screen tell you exactly what the Pit rolled',
       'THE DEEPER YOU CLIMB, THE WEIRDER IT GETS: bronze mostly rolls clean (55% for one twist), silver always rolls one, gold and platinum usually roll two, diamond and above always roll two. Every draw is seeded per attempt, so no two queues play the same fight',
@@ -126,7 +130,7 @@
       row.innerHTML = `
         <div class="rl-rank rk-${r.name.toLowerCase()}">${PIT.rankLabel(r)}</div>
         <div class="rl-sr">${r.min}${r.max === Infinity ? '+' : '-' + r.max}</div>
-        <div class="rl-mods">HP ×${mods.hpMult} · GAP ×${mods.gapMult}</div>`;
+        <div class="rl-mods">HP ×${PIT.fmtMul(mods.hpMult)} · GAP ×${PIT.fmtMul(mods.gapMult)}</div>`;
       ladder.appendChild(row);
     });
 
@@ -202,6 +206,13 @@
   cx.imageSmoothingEnabled = false;
   const STEP = 1 / 60;
   let st = null, acc = 0, last = 0, running = false, paused = false, overT = 0, flashT = 0;
+  // ROUND ANNOUNCER: every queue opens with a countdown that names the boss and its
+  // mutators (owner spec: "modifiers pop up right before the round starts ... count
+  // down from 5, say the boss name and the modifier(s) and what they do"). The sim is
+  // FROZEN while it is up — nothing steps, nothing hurts, input is gated — and P still
+  // pauses it. READY_GO is the short FIGHT beat after the last number.
+  const READY_SECS = 5, READY_GO = 0.45;
+  let readyT = 0, readyShown = -1;
   const keys = {};
   let particles = [];
 
@@ -219,15 +230,42 @@
     // fight seed — every attempt fights its own boss AND its own house twists
     st = PIT.createRun({ boss: bossIndex, charId: SAVE.char, seed: (Date.now() & 0xffffff) >>> 0, mods: PIT.rankMods(rk), rankName: rk.name });
     particles = []; acc = 0; overT = 0; paused = false; flashT = 0;
-    // overlay hygiene: a fresh fight must never open under a stale PAUSED/RESULTS overlay
+    // overlay hygiene: a fresh fight must never open under a stale PAUSED/RESULTS/ANNOUNCER overlay
     $('#result').hidden = true;
     $('#pause-ov').hidden = true;
+    $('#ready-ov').hidden = true;
     SAVE.runs++; persist();
     show('fight');
     const mutTag = st.mutators.length ? ' — ' + st.mutators.map(m => m.name).join(' · ') : '';
-    $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${st.mods.hpMult} GAP ×${st.mods.gapMult}${mutTag}`;
+    $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${PIT.fmtMul(st.mods.hpMult)} GAP ×${PIT.fmtMul(st.mods.gapMult)}${mutTag}`;
+    showReady(rk);
     running = true; last = performance.now();
     requestAnimationFrame(loop);
+  }
+
+  // ROUND ANNOUNCER: populate the pre-round overlay with the boss and its mutators
+  // (names + blurbs, so the player reads what each twist does before the gates open).
+  function showReady(rk) {
+    const ov = $('#ready-ov');
+    $('#ready-rank').textContent = PIT.rankLabel(rk) + ' — ROUND INCOMING';
+    const bossEl = $('#ready-boss');
+    bossEl.textContent = st.bossDef.name;
+    bossEl.style.color = st.bossDef.tint;
+    $('#ready-brief').textContent = `${st.bossDef.title} · ${st.boss.maxHp} HP at this pacing`;
+    const mrow = $('#ready-muts');
+    mrow.innerHTML = '';
+    if (st.mutators.length) {
+      for (const m of st.mutators) {
+        const d = el('div', 'rmut');
+        d.innerHTML = `<span class="rmut-name">${m.name}</span><span class="rmut-blurb">${m.blurb}</span>`;
+        mrow.appendChild(d);
+      }
+    } else {
+      mrow.appendChild(el('div', 'rmut rmut-none', '<span class="rmut-name">CLEAN QUEUE</span><span class="rmut-blurb">No mutators rolled — the lieutenant fights at face value.</span>'));
+    }
+    readyShown = -1; readyT = READY_SECS;
+    $('#ready-num').textContent = READY_SECS;
+    ov.hidden = false;
   }
 
   function endFight() {
@@ -278,7 +316,7 @@
     keys[e.key.toLowerCase()] = true;
     // pause toggle must be reachable while paused too — never gate it behind the early return
     if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }
-    if (!running || paused || !st || st.over) return;
+    if (!running || paused || readyT > -READY_GO || !st || st.over) return;
     if (e.key === ' ' || e.key === 'Shift') queueDash = true;
     if (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'q') queueAb = true;
   });
@@ -292,7 +330,7 @@
     if (!paused) { last = performance.now(); requestAnimationFrame(loop); }
   }
   $('#btn-resume').onclick = () => togglePause();
-  $('#btn-quit').onclick = () => { paused = false; $('#pause-ov').hidden = true; running = false; show('hub'); };
+  $('#btn-quit').onclick = () => { paused = false; $('#pause-ov').hidden = true; $('#ready-ov').hidden = true; readyT = 0; running = false; show('hub'); };
 
   function readInput() {
     const inp = {
@@ -308,6 +346,23 @@
     if (!running || paused) return;
     let dt = (now - last) / 1000; last = now;
     dt = Math.min(dt, 0.1);
+    // ROUND ANNOUNCER holds the sim frozen: count READY_SECS -> 1, show a short FIGHT
+    // beat, then open the gates this same frame. Pause freezes the countdown too.
+    if (readyT > -READY_GO) {
+      readyT -= dt;
+      const n = Math.ceil(readyT);
+      if (n !== readyShown) {
+        readyShown = n;
+        const numEl = $('#ready-num');
+        if (n > 0) { numEl.textContent = n; PIT_SFX.sfx('count'); }
+        else { numEl.textContent = 'FIGHT'; PIT_SFX.sfx('go'); }
+        numEl.classList.remove('pop'); void numEl.offsetWidth; numEl.classList.add('pop');
+      }
+      acc = 0;
+      render();
+      if (readyT > -READY_GO) { requestAnimationFrame(loop); return; }
+      $('#ready-ov').hidden = true;
+    }
     acc += dt;
     while (acc >= STEP) {
       if (!st.over) PIT.step(st, STEP, readInput());

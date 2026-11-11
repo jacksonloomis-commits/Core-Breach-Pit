@@ -492,6 +492,15 @@
     { id: 'bounty', name: 'BOUNTY', blurb: 'The Tide pays extra — SR payout ×1.3, win or lose.', srMult: 1.3 }
   ];
 
+  // ---------- display formatting (ROUND ANNOUNCER support) ----------
+  // Composed multipliers are float products (rank preset x mutator effects), so raw
+  // string interpolation prints garbage like 1.0999000000099999. fmtMul rounds to
+  // 3 decimals and returns the shortest clean string — THE ONLY sanctioned path for
+  // rendering a multiplier in the UI (fight title, ladder rows, announcer).
+  function fmtMul(x) {
+    return String(Math.round(x * 1000) / 1000);
+  }
+
   function rollMutators(rankName, seed) {
     const rank = RANKS.find(r => r.name === rankName) || RANKS[0];
     const hasSpawner = rank.pool.some(i => BOSSES.LIST[i].phases.some(ph => ph.patterns.some(p => p.type === 'spawn')));
@@ -668,7 +677,7 @@
 
   return {
     W, H, HUD, AR, CHARS, BOSSES, createRun, step, hurt, mulberry32, segDist, clamp, dist,
-    AGGRO, aggroAt, MUTATORS, rollMutators,
+    AGGRO, aggroAt, MUTATORS, rollMutators, fmtMul,
     SR, srDelta, RANKS, RANK_MODS, rankFor, rankLabel, rankMods, tierProgress,
     CHAR_UNLOCK_SR, applyRankedResult, TOP5_QUALIFY, TOP5_MOCK, leaderboardWith,
     SEASON, defaultRankedSave, seasonEnd, migrateSave

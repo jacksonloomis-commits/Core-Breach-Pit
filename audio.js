@@ -44,6 +44,8 @@
       case 'dead': tone(300, 0.6, 'sawtooth', 0.1, -240); break;
       case 'star': tone(1046, 0.15, 'square', 0.07, 0); break;
       case 'click': tone(700, 0.04, 'square', 0.04, 0); break;
+      case 'count': tone(480, 0.06, 'square', 0.05, 0); break;
+      case 'go': tone(392, 0.1, 'square', 0.07, 0); setTimeout(() => tone(587, 0.22, 'square', 0.08, 0), 100); break;
       default: break;
     }
   }
