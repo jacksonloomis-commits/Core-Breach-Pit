@@ -553,20 +553,20 @@
     IRIDESCENT: { hpMult: 2.0, gapMult: 0.7 }
   };
 
-  // Boss pools (owner spec, ARENA POOLS + PHASE FURY + ROUND VARIETY): indices into
-  // bosses.js LIST. "Each arena should have its own boss pool" — every rank owns an
-  // EXCLUSIVE pool; no boss rolls in two arenas. The five beyond/gold pools now roll
-  // FOUR bodies each (ROUND VARIETY 2026.11.14, owner spec: "add a few more bosses
-  // anyways"):
-  //   BRONZE     [0-4]     the bronze band, unchanged ("super ez" by design)
-  //   SILVER     [5-10]    THE DEATHWARRANT AREA, champion weight
-  //   GOLD       [11-14]   the tax collectors — BRASS HERALD, THE AUDITOR, TOLLMASTER, THE LEDGER
-  //   PLATINUM   [15-18]   gravewake + cindermaw + HOLLOW REGENT + ironchoir (first gate past the champion)
-  //   DIAMOND    [19-22]   theloom + dredgewarden + fathom + PRESSURE SAINT
-  //   CRIMSON    [23-26]   maelstrom + goreprelate + nullsovereign + THE MARSHAL
-  //   IRIDESCENT [27-30]   theglutton + PALE LEVIATHAN + oldwater + tideunbound (the Tide itself)
+  // Boss pools (owner spec, ARENA POOLS + PHASE FURY + ROUND VARIETY + FULL BENCH):
+  // indices into bosses.js LIST. "Each arena should have its own boss pool" — every
+  // rank owns an EXCLUSIVE pool; no boss rolls in two arenas. FULL BENCH 2026.11.17
+  // (owner spec: "add a boss or two more to each Arena for even more variety") fills
+  // every bench — the seven pools now roll FIVE to SEVEN bodies each:
+  //   BRONZE     [0-5]     the bronze band + MOSSBACK ("super ez" by design)
+  //   SILVER     [6-12]    THE DEATHWARRANT AREA + THE BALLAST (champion weight)
+  //   GOLD       [13-18]   the tax collectors + THE MINTER + THE EXCHEQUER
+  //   PLATINUM   [19-24]   first gate past the champion + THE PUPPETEER + LANTERN MAW
+  //   DIAMOND    [25-29]   the deep pressure + THE UNDERTOW
+  //   CRIMSON    [30-35]   the king's court + THE GORGET + VESPER
+  //   IRIDESCENT [36-41]   the Tide itself + THE ABYSSAL ARCHIVE + THE LAST SHORE
   // A suite test pins OWNERSHIP: the seven pools are pairwise disjoint and their
-  // union is the entire 31-boss roster, pool max base HP escalating arena by arena.
+  // union is the entire 42-boss roster, pool max base HP escalating arena by arena.
   // Bot gates: every boss is proven at its rank preset where VOLT can live there
   // (bronze/silver/gold 3/3) and at base for the beyond band (BULWARK 3/3).
   // PLATINUM+ presets remain the designed beyond-bot wall — humans outplay the bot
@@ -576,24 +576,24 @@
   // exact minion kill rate), so the swarm never emptied and the fight could not END.
   // Summon cadence law: spawner phases keep spawn at most 1-of-3 patterns, cap <= 4-6.
   const RANKS = [
-    { name: 'BRONZE', tier: 1, min: 0, max: 200, pool: [0, 1, 2, 3, 4] },
-    { name: 'BRONZE', tier: 2, min: 200, max: 300, pool: [0, 1, 2, 3, 4] },
-    { name: 'BRONZE', tier: 3, min: 300, max: 500, pool: [0, 1, 2, 3, 4] },
-    { name: 'SILVER', tier: 1, min: 500, max: 600, pool: [5, 6, 7, 8, 9, 10] },
-    { name: 'SILVER', tier: 2, min: 600, max: 700, pool: [5, 6, 7, 8, 9, 10] },
-    { name: 'SILVER', tier: 3, min: 700, max: 800, pool: [5, 6, 7, 8, 9, 10] },
-    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [11, 12, 13, 14] },
-    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [11, 12, 13, 14] },
-    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [15, 16, 17, 18] },
-    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [15, 16, 17, 18] },
-    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [15, 16, 17, 18] },
-    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [19, 20, 21, 22] },
-    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [19, 20, 21, 22] },
-    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [19, 20, 21, 22] },
-    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [23, 24, 25, 26] },
-    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [23, 24, 25, 26] },
-    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [23, 24, 25, 26] },
-    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [27, 28, 29, 30] }
+    { name: 'BRONZE', tier: 1, min: 0, max: 200, pool: [0, 1, 2, 3, 4, 5] },
+    { name: 'BRONZE', tier: 2, min: 200, max: 300, pool: [0, 1, 2, 3, 4, 5] },
+    { name: 'BRONZE', tier: 3, min: 300, max: 500, pool: [0, 1, 2, 3, 4, 5] },
+    { name: 'SILVER', tier: 1, min: 500, max: 600, pool: [6, 7, 8, 9, 10, 11, 12] },
+    { name: 'SILVER', tier: 2, min: 600, max: 700, pool: [6, 7, 8, 9, 10, 11, 12] },
+    { name: 'SILVER', tier: 3, min: 700, max: 800, pool: [6, 7, 8, 9, 10, 11, 12] },
+    { name: 'GOLD', tier: 1, min: 800, max: 900, pool: [13, 14, 15, 16, 17, 18] },
+    { name: 'GOLD', tier: 2, min: 900, max: 1100, pool: [13, 14, 15, 16, 17, 18] },
+    { name: 'PLATINUM', tier: 1, min: 1100, max: 1400, pool: [19, 20, 21, 22, 23, 24] },
+    { name: 'PLATINUM', tier: 2, min: 1400, max: 1700, pool: [19, 20, 21, 22, 23, 24] },
+    { name: 'PLATINUM', tier: 3, min: 1700, max: 2000, pool: [19, 20, 21, 22, 23, 24] },
+    { name: 'DIAMOND', tier: 1, min: 2000, max: 2200, pool: [25, 26, 27, 28, 29] },
+    { name: 'DIAMOND', tier: 2, min: 2200, max: 2400, pool: [25, 26, 27, 28, 29] },
+    { name: 'DIAMOND', tier: 3, min: 2400, max: 2500, pool: [25, 26, 27, 28, 29] },
+    { name: 'CRIMSON', tier: 1, min: 2500, max: 2800, pool: [30, 31, 32, 33, 34, 35] },
+    { name: 'CRIMSON', tier: 2, min: 2800, max: 3100, pool: [30, 31, 32, 33, 34, 35] },
+    { name: 'CRIMSON', tier: 3, min: 3100, max: 3500, pool: [30, 31, 32, 33, 34, 35] },
+    { name: 'IRIDESCENT', tier: 1, min: 3500, max: Infinity, pool: [36, 37, 38, 39, 40, 41] }
   ];
 
   function rankFor(sr) {

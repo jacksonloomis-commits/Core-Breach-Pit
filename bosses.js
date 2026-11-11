@@ -35,6 +35,28 @@
 // iridescent endgame. The engine now also rolls ROUND VARIETY mutators with every queue
 // (see MUTATORS in engine.js) — boss data here is untouched by them except minion HP
 // (BROOD BLIGHT) and they never change spawn counts or caps (summon-cadence law).
+// FULL BENCH 2026.11.17 (owner spec: "add a boss or two more to each Arena for even more
+// variety"): the roster goes 31 -> 42 — MOSSBACK (262) joins the bronze warm-up, THE
+// BALLAST (510) the DEATHWARRANT area, THE MINTER (566) + THE EXCHEQUER (576) the tax
+// office, THE PUPPETEER (606) + LANTERN MAW (614) the platinum gate, THE UNDERTOW (644)
+// the diamond deep, THE GORGET (671) + VESPER (676) the crimson court, THE ABYSSAL
+// ARCHIVE (705, 4 phases) + THE LAST SHORE (711, 4 phases) the iridescent endgame.
+// Every arena now rolls FIVE to SEVEN lieutenants (bronze 6 / silver 7 / gold 6 /
+// platinum 6 / diamond 5 / crimson 6 / iridescent 6). The new bodies recombine patterns
+// already proven at their tier's pacing (one pressure theme per phase), all bot-gated
+// 3/3 at their presets. Spawner phases keep the summon-cadence law: spawn is 1-of-3
+// patterns with caps 4-5, never in a two-pattern phase.
+// FULL BENCH 2026.11.17 (owner spec: "add a boss or two more to each Arena for even more
+// variety"): the roster goes 31 -> 42 — MOSSBACK (262) joins the bronze warm-up, THE
+// BALLAST (510) the DEATHWARRANT area, THE MINTER (566) + THE EXCHEQUER (576) the tax
+// office, THE PUPPETEER (606) + LANTERN MAW (614) the platinum gate, THE UNDERTOW (644)
+// the diamond deep, THE GORGET (671) + VESPER (676) the crimson court, THE ABYSSAL
+// ARCHIVE (705, 4 phases) + THE LAST SHORE (711, 4 phases) the iridescent endgame.
+// Every arena now rolls FIVE to SEVEN lieutenants (bronze 6 / silver 7 / gold 6 /
+// platinum 6 / diamond 5 / crimson 6 / iridescent 6). New bodies are recombina-
+// tions of patterns already proven at their tier's pacing (one pressure theme per
+// phase), all bot-gated 3/3 at their presets. Spawner phases keep the summon-cadence
+// law: spawn is 1-of-3 patterns with caps 4-5, never in a two-pattern phase.
 // A test pins the calibration: silver-band HP must stay within 480..560, bronze <= 300,
 // gold strictly past the silver anchor and under 600, beyond strictly above silver.
 // A second test pins OWNERSHIP: the seven arena pools are pairwise disjoint and their
@@ -106,6 +128,16 @@
         { until: 0.5, gap: 1.1, patterns: [charge(150, 0.85, 0.75), ring(12, 54, 0.8), aimed(3, 18, 78, 0.7)] }
       ]
     },
+    {
+      id: 'mossback', name: 'MOSSBACK', hp: 262, r: 11, band: 'bronze',
+      title: 'OLD GROWTH OF THE LOW GATES',
+      brief: 'It was gate ornament once, and the algae never stopped growing. Slow slugs, thin rings, and spore puddles by the second act.',
+      tint: '#5a9e6f',
+      phases: [
+        { until: 1, gap: 1.35, patterns: [aimed(2, 14, 74, 0.8), ring(11, 52, 0.8)] },
+        { until: 0.5, gap: 1.15, patterns: [zone(3, 20, 4.5, 0.8), shotgun(2, 3, 20, 72, 0.75, 0.55), ring(10, 50, 0.8)] }
+      ]
+    },
 
     // ================= SILVER BAND — THE DEATHWARRANT AREA (owner spec: silver = champion weight) =================
     {
@@ -174,11 +206,22 @@
         { until: 0.33, gap: 1.05, patterns: [spawn(2, 5, 0.6), spiral(3, 0.15, 6, 52, 0.6)], enrage: true }
       ]
     },
+    {
+      id: 'ballast', name: 'THE BALLAST', hp: 510, r: 12, band: 'silver',
+      title: 'SUNKEN WEIGHT OF THE CHAMPION DOCKS',
+      brief: 'Every champion ship carries ballast, and every ballast dreams of the deep. Volley decks, flooded plating, and a charge like the tide pulling out.',
+      tint: '#5f6f85',
+      phases: [
+        { until: 1, gap: 1.2, patterns: [shotgun(2, 4, 24, 72, 0.7, 0.55), aimed(2, 12, 74, 0.75)] },
+        { until: 0.66, gap: 1.05, patterns: [ring(13, 56, 0.7), zone(3, 22, 4.5, 0.7)] },
+        { until: 0.33, gap: 0.95, patterns: [charge(162, 0.85, 0.7), ring(13, 58, 0.65)] }
+      ]
+    },
 
     // ================= GOLD BAND — the Tide's tax collectors (owner spec, ARENA POOLS) =================
     // Strictly past the DEATHWARRANT anchor (520), under the old gods (600): the GOLD
-    // arena rolls ONLY these four. 3 phases, real pacing — the first rank that fights
-    // for it, not against children. Ordered by base HP.
+    // arena rolls ONLY these six. 3 phases, real pacing — the first rank that fights
+    // for it, not against children.
     {
       id: 'brassherald', name: 'BRASS HERALD', hp: 525, r: 11, band: 'gold',
       title: 'TRUMPET OF THE HIGH TIDE',
@@ -227,11 +270,34 @@
       ]
     },
 
-    // ================= BEYOND BAND — past the champion (one exclusive quartet per rank) =================
+    // ================= BEYOND BAND — past the champion (one exclusive bench per rank) =================
     // Ordered by base HP so the ladder escalates: PLATINUM -> gravewake/cindermaw/
-    // hollowregent/ironchoir, DIAMOND -> theloom/dredgewarden/fathom/pressuresaint,
-    // CRIMSON -> maelstrom/goreprelate/nullsovereign/marshal, IRIDESCENT -> theglutton/
-    // paleleviathan/oldwater/tideunbound.
+    // hollowregent/ironchoir/puppeteer/lanternmaw, DIAMOND -> theloom/dredgewarden/
+    // fathom/undertow/pressuresaint, CRIMSON -> maelstrom/goreprelate/nullsovereign/
+    // marshal/gorget/vesper, IRIDESCENT -> theglutton/paleleviathan/oldwater/archive/
+    // lastshore/tideunbound.
+    {
+      id: 'minter', name: 'THE MINTER', hp: 566, r: 11, band: 'gold',
+      title: "IT COINS THE TIDE'S FACE",
+      brief: 'The mint never closed. Coin-rings and stamp volleys — every bullet is legal tender, and every one is spent on you.',
+      tint: '#f5deb3',
+      phases: [
+        { until: 1, gap: 1.2, patterns: [ring(12, 56, 0.7), aimed(3, 16, 78, 0.7)] },
+        { until: 0.66, gap: 1.05, patterns: [spiral(3, 0.15, 6, 58, 0.6), shotgun(2, 4, 24, 76, 0.65, 0.5)] },
+        { until: 0.33, gap: 0.95, patterns: [ring(13, 58, 0.6), aimed(3, 18, 82, 0.6), spiral(3, 0.14, 7, 58, 0.55)] }
+      ]
+    },
+    {
+      id: 'exchequer', name: 'THE EXCHEQUER', hp: 576, r: 12, band: 'gold',
+      title: 'THE VAULT THAT WALKS',
+      brief: 'The tax office built a vault and gave it legs. It charges to collect, and pools the interest exactly where you stand.',
+      tint: '#b8b2a0',
+      phases: [
+        { until: 1, gap: 1.2, patterns: [charge(158, 0.85, 0.8), ring(11, 54, 0.7)] },
+        { until: 0.66, gap: 1.05, patterns: [zone(3, 20, 4.5, 0.7), aimed(2, 12, 76, 0.7)] },
+        { until: 0.33, gap: 0.95, patterns: [charge(166, 0.85, 0.65), ring(13, 56, 0.6), shotgun(2, 3, 22, 74, 0.65, 0.55)] }
+      ]
+    },
     {
       id: 'gravewake', name: 'GRAVEWAKE', hp: 560, r: 12, band: 'beyond',
       title: "THE TIDE'S REGURGITANT",
@@ -286,6 +352,30 @@
       ]
     },
     {
+      id: 'puppeteer', name: 'THE PUPPETEER', hp: 606, r: 12, band: 'beyond',
+      title: 'IT PULLS THE STRINGS BELOW',
+      brief: 'Something under the Pit holds the threads. Bullet-spirals on stage, a brood in the wings, cutting beams for the finale.',
+      tint: '#d060a8',
+      phases: [
+        { until: 1, gap: 1.15, patterns: [spiral(4, 0.14, 7, 56, 0.6), ring(12, 56, 0.65)] },
+        // summon-cadence law: spawn is 1-of-3 patterns with cap 4 (the GRAVEWAKE brood
+        // fix shape) — never in a two-pattern phase, never above the kill rate.
+        { until: 0.66, gap: 1.0, patterns: [spawn(2, 4, 0.6), ring(13, 58, 0.6), sweep(56, 2.2, 3, 0.65)] },
+        { until: 0.33, gap: 0.95, patterns: [spawn(2, 4, 0.55), sweep(58, 2.3, 3, 0.6, 2), aimed(3, 16, 80, 0.6)] }
+      ]
+    },
+    {
+      id: 'lanternmaw', name: 'LANTERN MAW', hp: 614, r: 13, band: 'beyond',
+      title: 'THE LIGHT BELOW IS A MOUTH',
+      brief: 'A soft gold light in the deep, and the floor opens under it. Lure pools, bubble rings, and one very real charge.',
+      tint: '#5fe0c0',
+      phases: [
+        { until: 1, gap: 1.15, patterns: [zone(3, 22, 4.5, 0.7), aimed(3, 16, 78, 0.65)] },
+        { until: 0.66, gap: 1.0, patterns: [ring(14, 58, 0.6), shotgun(2, 4, 26, 76, 0.65, 0.5), zone(4, 22, 4.5, 0.6)] },
+        { until: 0.33, gap: 0.95, patterns: [charge(170, 0.85, 0.65), ring(14, 58, 0.6), spiral(3, 0.15, 6, 56, 0.6)], enrage: true }
+      ]
+    },
+    {
       id: 'theloom', name: 'THE LOOM', hp: 620, r: 12, band: 'beyond',
       title: 'WEAVER OF THE TIDE-THREAD',
       brief: 'Spins bullet-thread into curtains you have to thread. The weave tightens every phase — find the gaps in the pattern.',
@@ -317,6 +407,17 @@
         { until: 0.75, gap: 0.95, patterns: [spiral(5, 0.13, 8, 60, 0.55), spawn(2, 6, 0.6)] },
         { until: 0.5, gap: 0.85, patterns: [ring(16, 62, 0.55), zone(4, 24, 5, 0.6), spiral(4, 0.12, 8, 62, 0.55)] },
         { until: 0.25, gap: 0.8, patterns: [spiral(6, 0.12, 9, 62, 0.5), spawn(3, 7, 0.55), ring(16, 64, 0.5)], enrage: true }
+      ]
+    },
+    {
+      id: 'undertow', name: 'THE UNDERTOW', hp: 644, r: 12, band: 'beyond',
+      title: 'THE PULL BENEATH EVERY WAVE',
+      brief: 'You never see it — only what it drags. Spiral silt and ring-sets that close like water over a head.',
+      tint: '#7080b8',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [spiral(4, 0.13, 7, 58, 0.6), ring(14, 60, 0.6)] },
+        { until: 0.66, gap: 0.95, patterns: [zone(4, 22, 4.5, 0.6), spiral(5, 0.12, 8, 60, 0.55), ring(14, 60, 0.55)] },
+        { until: 0.33, gap: 0.9, patterns: [spiral(5, 0.12, 9, 62, 0.5), ring(16, 62, 0.55), shotgun(2, 4, 26, 78, 0.6, 0.5)] }
       ]
     },
     {
@@ -376,6 +477,32 @@
       ]
     },
     {
+      id: 'gorget', name: 'THE GORGET', hp: 671, r: 13, band: 'beyond',
+      title: 'THE COLLAR OF THE CRIMSON GATE',
+      brief: 'Court armor that outlived its king. Cutting sweeps, verdict shotguns and sentence charges, worn like jewelry.',
+      tint: '#a82c5c',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [sweep(58, 2.3, 3, 0.6), shotgun(2, 4, 26, 76, 0.65, 0.5)] },
+        { until: 0.66, gap: 1.0, patterns: [charge(168, 0.85, 0.7), ring(13, 58, 0.6), aimed(2, 12, 78, 0.65)] },
+        { until: 0.33, gap: 0.9, patterns: [sweep(60, 2.4, 3, 0.55, 2), charge(172, 0.85, 0.65), ring(13, 58, 0.55)], enrage: true }
+      ]
+    },
+    {
+      id: 'vesper', name: 'VESPER', hp: 676, r: 12, band: 'beyond',
+      title: 'EVENSONG FOR THE SUNKEN THRONE',
+      brief: 'The court sings vespers for a throne that drowned. Rings in choir rows, silt pews, and a brood that hums along.',
+      tint: '#e07a9a',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [ring(14, 60, 0.6), spiral(3, 0.14, 7, 58, 0.6)] },
+        // probe fix (roster44, seed 3 died @59s): the shipped p2 paired silt zones with the
+        // brood — the minions herded the bot INTO the live pools (every hit was minion
+        // contact during zone cycles). The brood phase keeps the summon-cadence shape
+        // (spawn 1-of-3, cap 4) and drops floor denial; the silt moves to the finale.
+        { until: 0.66, gap: 0.95, patterns: [spawn(2, 4, 0.6), ring(13, 58, 0.65), ring(12, 58, 0.65)] },
+        { until: 0.33, gap: 0.9, patterns: [spiral(4, 0.13, 8, 60, 0.55), ring(16, 62, 0.5), zone(3, 22, 4.5, 0.55)], enrage: true }
+      ]
+    },
+    {
       id: 'theglutton', name: 'THE GLUTTON', hp: 680, r: 13, band: 'beyond',
       title: 'IT DEVOURS THE PIT',
       brief: "The Tide's hunger given a body. It eats floor, brood and light — everything except you, so far. Starve it or feed it.",
@@ -408,6 +535,32 @@
         { until: 0.75, gap: 1.0, patterns: [spiral(4, 0.13, 8, 58, 0.55), ring(15, 60, 0.6), aimed(3, 18, 82, 0.6)] },
         { until: 0.5, gap: 0.95, patterns: [zone(4, 24, 5, 0.6), spiral(5, 0.12, 8, 60, 0.55), ring(16, 62, 0.55)] },
         { until: 0.25, gap: 0.9, patterns: [ring(16, 62, 0.55), spiral(4, 0.13, 8, 58, 0.5), spawn(2, 5, 0.55)], enrage: true }
+      ]
+    },
+    {
+      id: 'archive', name: 'THE ABYSSAL ARCHIVE', hp: 705, r: 13, band: 'beyond',
+      title: 'EVERY DROWNING, DOCUMENTED',
+      brief: 'The deep keeps records. Cutting beams cite their sources, spirals footnote the floor, and the final chapter is angry.',
+      tint: '#9fb8e8',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [aimed(3, 18, 80, 0.65), ring(13, 58, 0.6)] },
+        { until: 0.75, gap: 1.0, patterns: [sweep(56, 2.3, 3, 0.6, 2), zone(3, 22, 4.5, 0.6)] },
+        { until: 0.5, gap: 0.95, patterns: [spiral(5, 0.12, 8, 60, 0.55), shotgun(2, 4, 28, 76, 0.6, 0.5), ring(14, 60, 0.55)] },
+        // summon-cadence law: spawn 1-of-3, cap 4.
+        { until: 0.25, gap: 0.9, patterns: [sweep(58, 2.4, 3, 0.55, 2), spiral(4, 0.13, 8, 58, 0.5), spawn(2, 4, 0.55)], enrage: true }
+      ]
+    },
+    {
+      id: 'lastshore', name: 'THE LAST SHORE', hp: 711, r: 13, band: 'beyond',
+      title: 'WHERE THE TIDE GOES TO DIE',
+      brief: 'Past every gate there is a beach where the Tide finally stops. Rings break on it, spirals pool on it, and it remembers every wave.',
+      tint: '#d8d0a8',
+      phases: [
+        { until: 1, gap: 1.1, patterns: [ring(15, 60, 0.6), zone(3, 22, 4.5, 0.6)] },
+        { until: 0.75, gap: 1.0, patterns: [spiral(4, 0.13, 8, 60, 0.55), aimed(4, 20, 84, 0.55)] },
+        { until: 0.5, gap: 0.95, patterns: [sweep(58, 2.3, 3, 0.6, 2), ring(15, 62, 0.55), zone(4, 24, 5, 0.55)] },
+        // summon-cadence law: spawn 1-of-3, cap 5.
+        { until: 0.25, gap: 0.9, patterns: [spiral(5, 0.12, 9, 62, 0.5), ring(16, 62, 0.5), spawn(2, 5, 0.55)], enrage: true }
       ]
     },
     {

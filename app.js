@@ -1,8 +1,13 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.16';
+  const BUILD = '2026.11.17';
   const UPDATE_LOG = [
+    { version: '2026.11.17', tag: 'FULL BENCH', items: [
+      'THE ROSTER GOES 31 -> 42 (owner spec: "add a boss or two more to each Arena for even more variety"): every arena bench is stocked — MOSSBACK joins the bronze warm-up, THE BALLAST the DEATHWARRANT area, THE MINTER + THE EXCHEQUER the tax office, THE PUPPETEER + LANTERN MAW the platinum gate, THE UNDERTOW the diamond deep, THE GORGET + VESPER the crimson court, and THE ABYSSAL ARCHIVE + THE LAST SHORE (both four phases) the iridescent endgame. Bronze rolls six, silver seven, the rest five or six — no more four-boss arenas',
+      'EVERY NEW BODY IS BOT-PROVEN 3/3 AT ITS GATE: MOSSBACK at the BRONZE preset (VOLT), THE BALLAST at SILVER, THE MINTER + THE EXCHEQUER at GOLD, the seven beyond lieutenants at base (BULWARK) — and every existing gate re-proven with the deeper pools',
+      'THE NEW BOSSES RECOMBINE PROVEN PATTERNS at their tier\'s pacing (one pressure theme per phase), and every spawner phase obeys the summon-cadence law: spawn 1-of-3 patterns with the swarm capped at 4-5, never in a two-pattern phase'
+    ] },
     { version: '2026.11.16', tag: 'HONEST DASH', items: [
       'FIXED (owner report: the dotted red line is supposed to be a dash but the boss only moves like an inch): a first-frame timing bug clamped EVERY charge in the game to 0.01s before it even started — the dash you were promised never happened. Charges now run their full dash (~120-150px, angry phases faster), and a body hit from a charging lieutenant still hurts',
       'THE DASHED LINE TELLS THE TRUTH NOW: it shows the EXACT path the boss will charge — same length as the real dash, cut off honestly at a wall, with a stop marker where the boss will land. Read the line, step aside, punish the recovery'
@@ -680,6 +685,61 @@
         px(x - r + 1, y - r - 3, 3, 5, C.gold); px(x + r - 4, y - r - 3, 3, 5, C.gold); px(x - 2, y - r - 4, 4, 6, C.gold); // triple crown
         px(x - 6, y - 3, 12, 5, flash ? C.white : C.void);
         px(x - 4, y - 2, 2, 2, C.crimson); px(x + 2, y - 2, 2, 2, C.crimson); break;
+      case 'mossback':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r + 2, y - r - 2, 4, 4, dark); px(x + r - 6, y - r - 1, 5, 3, dark); px(x - 1, y - r - 3, 3, 3, dark); // moss growths
+        px(x - r + 2, y + 1, r * 2 - 4, 3, dark); // algae skirt
+        px(x - 4, y - 2, 3, 3, flash ? C.white : C.void); px(x + 2, y - 2, 3, 3, flash ? C.white : C.void); break; // sleepy eyes
+      case 'ballast':
+        px(x - r + 1, y - r + 3, r * 2 - 2, r * 2 - 3, tint);
+        px(x - 3, y - r - 4, 6, 7, dark); // shackle ring
+        px(x - r - 2, y - 2, 3, 8, dark); px(x + r - 1, y - 2, 3, 8, dark); // flukes
+        px(x - 4, y - 1, 8, 3, flash ? C.white : C.void); px(x - 2, y, 2, 2, C.tealite); break; // drowned port
+      case 'minter':
+        px(x - r + 1, y - r + 2, r * 2 - 2, r * 2 - 2, tint);
+        px(x - r + 3, y + 1, 6, 3, flash ? C.white : C.gold); px(x + r - 9, y + 1, 6, 3, flash ? C.white : C.gold); // coin stacks
+        px(x - 2, y - r - 4, 4, 6, flash ? C.white : C.gold); // mint press
+        px(x - 3, y - 2, 6, 3, flash ? C.white : C.void); break; // die slot
+      case 'exchequer':
+        px(x - r, y - r + 1, r * 2, r * 2 - 1, tint);
+        px(x - r + 2, y - r - 3, 4, 4, dark); px(x + r - 6, y - r - 3, 4, 4, dark); // hinges
+        px(x - 5, y - 3, 10, 8, dark); // vault door
+        px(x - 2, y - 1, 4, 4, flash ? C.white : C.gold); break; // the dial
+      case 'puppeteer':
+        px(x - r - 1, y - r - 2, r * 2 + 2, 3, dark); // control bar
+        px(x - 4, y - r + 1, 2, 6, flash ? C.white : C.gold); px(x + 2, y - r + 1, 2, 6, flash ? C.white : C.gold); // strings
+        px(x - r + 2, y - 3, r * 2 - 4, 8, tint); // hanging body
+        px(x - 3, y - 1, 3, 3, flash ? C.white : C.void); px(x + 1, y - 1, 3, 3, flash ? C.white : C.void); break; // joint eyes
+      case 'lanternmaw':
+        px(x - r, y - r + 3, r * 2, r * 2 - 3, tint);
+        px(x - 1, y - r - 4, 2, 7, dark); px(x - 3, y - r - 6, 5, 3, flash ? C.white : C.gold); // lure stalk + bulb
+        px(x - r + 2, y + 1, r * 2 - 4, 4, flash ? C.white : C.void); // the maw
+        px(x - r + 3, y + 2, 2, 2, C.gold); px(x - 1, y + 2, 2, 2, C.gold); px(x + r - 5, y + 2, 2, 2, C.gold); break; // teeth
+      case 'undertow':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r, y - r - 2, r * 2, 3, flash ? C.white : C.tealite); // the crest
+        px(x - r + 2, y - 1, r * 2 - 4, 2, dark); px(x - r + 4, y + 3, r * 2 - 8, 2, dark); // pull currents
+        px(x - 2, y - 2, 4, 4, flash ? C.white : C.void); break;
+      case 'gorget':
+        px(x - r + 1, y - r + 2, r * 2 - 2, r * 2 - 2, tint);
+        px(x - r, y - 4, r * 2, 3, dark); px(x - r, y + 2, r * 2, 3, dark); // collar plates
+        px(x - r - 2, y - r + 1, 3, 5, flash ? C.white : C.gold); px(x + r - 1, y - r + 1, 3, 5, flash ? C.white : C.gold); // gorget wings
+        px(x - 3, y - 2, 6, 3, flash ? C.white : C.void); break; // visor slit
+      case 'vesper':
+        px(x - r + 2, y - r + 2, r * 2 - 4, r * 2 - 2, tint); // the bell robe
+        px(x - 4, y - r - 4, 8, 2, flash ? C.white : C.gold); px(x - 2, y - r - 2, 4, 2, flash ? C.white : C.gold); // halo
+        px(x - r + 2, y - 2, r * 2 - 4, 2, dark);
+        px(x - 3, y - 1, 3, 3, flash ? C.white : C.void); px(x + 1, y - 1, 3, 3, flash ? C.white : C.void); break; // choir eyes
+      case 'archive':
+        px(x - r, y - r + 1, r * 2, r * 2 - 1, tint);
+        px(x - r + 2, y - r + 3, r * 2 - 4, 2, dark); px(x - r + 2, y - 1, r * 2 - 4, 2, dark); px(x - r + 2, y + 3, r * 2 - 4, 2, dark); // shelves
+        px(x - 4, y - r - 3, 3, 4, flash ? C.white : C.gold); px(x + 2, y - r - 3, 3, 4, flash ? C.white : C.gold); // candle tablets
+        px(x - 2, y - 4, 4, 3, flash ? C.white : C.void); break; // record eye
+      case 'lastshore':
+        px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
+        px(x - r, y - r - 2, r * 2, 3, flash ? C.white : C.white); // the last wave
+        px(x - r + 2, y + 1, r * 2 - 4, 3, flash ? C.white : C.void); // the sand hollow
+        px(x - 5, y - 3, 3, 3, C.tealite); px(x + 3, y - 2, 3, 3, C.tealite); px(x - 1, y - 5, 2, 2, C.tealite); break; // drift bones
       default: // deathwarrant
         px(x - r, y - r + 2, r * 2, r * 2 - 2, tint);
         px(x - r + 2, y - r - 3, 3, 5, C.gold); px(x + r - 5, y - r - 3, 3, 5, C.gold); // crown

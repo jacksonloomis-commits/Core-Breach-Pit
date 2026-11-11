@@ -148,11 +148,11 @@ function runFight(boss, charId, seed, capSec, opts = {}) {
 
 // ================= data integrity =================
 console.log('--- Data integrity (ARENA POOLS + PHASE FURY + ROUND VARIETY) ---');
-check('31 bosses defined', BOSSES.LIST.length === 31, String(BOSSES.LIST.length));
-check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 31);
-check('bands: 5 bronze / 6 silver / 4 gold / 16 beyond',
-  bandBosses('bronze').length === 5 && bandBosses('silver').length === 6 &&
-  bandBosses('gold').length === 4 && bandBosses('beyond').length === 16,
+check('42 bosses defined', BOSSES.LIST.length === 42, String(BOSSES.LIST.length));
+check('boss ids unique', new Set(BOSSES.LIST.map(b => b.id)).size === 42);
+check('bands: 6 bronze / 7 silver / 6 gold / 23 beyond',
+  bandBosses('bronze').length === 6 && bandBosses('silver').length === 7 &&
+  bandBosses('gold').length === 6 && bandBosses('beyond').length === 23,
   `${bandBosses('bronze').length}/${bandBosses('silver').length}/${bandBosses('gold').length}/${bandBosses('beyond').length}`);
 check('every boss carries title, brief and tint', BOSSES.LIST.every(b => b.title && b.brief && b.tint && b.band));
 
@@ -183,11 +183,11 @@ check(`beyond band is past the champion (HP ${Math.min(...beyondHP)}..${Math.max
   });
   const union = pools.flatMap(x => x.p);
   const disjoint = pools.every((a, i) => pools.every((b, j) => i >= j || a.p.every(i => !b.p.includes(i))));
-  check(`the ladder has 7 arenas, each owning a pool of >= 3 bosses (${names.join('/')})`,
-    names.length === 7 && pools.every(x => x.p.length >= 3), pools.map(x => `${x.n}:${x.p.length}`).join(' '));
+  check(`the ladder has 7 arenas, each owning a FULL BENCH of >= 5 bosses (${names.join('/')})`,
+    names.length === 7 && pools.every(x => x.p.length >= 5), pools.map(x => `${x.n}:${x.p.length}`).join(' '));
   check('no boss rolls in two arenas (pools pairwise disjoint)', disjoint);
-  check('the pools cover the whole roster (all 31 bosses reachable somewhere)',
-    new Set(union).size === 31 && union.length === 31, `union ${new Set(union).size}/31`);
+  check('the pools cover the whole roster (all 42 bosses reachable somewhere)',
+    new Set(union).size === 42 && union.length === 42, `union ${new Set(union).size}/42`);
   const bandOf = { BRONZE: 'bronze', SILVER: 'silver', GOLD: 'gold' };
   check('bronze/silver/gold arenas roll only their own band',
     pools.filter(x => bandOf[x.n]).every(x => x.p.every(i => BOSSES.LIST[i].band === bandOf[x.n])));
@@ -831,7 +831,7 @@ console.log('--- Fuzz ---');
   } catch (e) { crashed = true; }
   // ROUND VARIETY effect pins are in the mutators section below; this fuzz covers the
   // whole roster including the five ROUND VARIETY additions.
-  check('random-input fuzz across all 31 bosses: no crash', !crashed);
+  check('random-input fuzz across all 42 bosses: no crash', !crashed);
 }
 
 // ================= charge honesty (owner report: "they only move like an inch") =================
@@ -844,8 +844,8 @@ console.log('--- Charge honesty ---');
   BOSSES.LIST.forEach((b, i) => b.phases.forEach(ph => ph.patterns.forEach(p => {
     if (p.type === 'charge') charges.push({ b, p });
   })));
-  check(`every charge in the roster carries a real dash (16 patterns, speed x dur >= 110; found ${charges.length})`,
-    charges.length === 16 && charges.every(c => c.p.speed * c.p.dur >= 110));
+  check(`every charge in the roster carries a real dash (22 patterns, speed x dur >= 110; found ${charges.length})`,
+    charges.length === 22 && charges.every(c => c.p.speed * c.p.dur >= 110));
   check('charge speed stays under the fairness cap (190)', charges.every(c => c.p.speed <= 190));
   {
     // natural-transition travel: put the boss mid-arena, let the ENGINE do the
@@ -883,6 +883,27 @@ console.log('--- Charge honesty ---');
   }
 }
 
+// ================= FULL BENCH (owner spec: "add a boss or two more to each Arena") =================
+console.log('--- Full bench: the 2026.11.17 additions ---');
+{
+  const NEW = ['mossback', 'ballast', 'minter', 'exchequer', 'puppeteer', 'lanternmaw', 'undertow', 'gorget', 'vesper', 'archive', 'lastshore'];
+  check('all eleven FULL BENCH bodies exist with title/tint/brief',
+    NEW.every(id => { const b = byId(id); return !!b && b.title && b.tint && b.brief; }));
+  check('the new gold-band bodies sit in the gold band, the seven new beyond bodies beyond it',
+    ['mossback', 'bronze', 'ballast', 'silver', 'minter', 'gold', 'exchequer', 'gold'].every((v, i, a) =>
+      i % 2 === 0 ? byId(v).band === a[i + 1] : true) &&
+    ['puppeteer', 'lanternmaw', 'undertow', 'gorget', 'vesper', 'archive', 'lastshore'].every(id => byId(id).band === 'beyond'));
+  check('every new beyond spawner obeys the summon-cadence law (spawn 1-of-3 patterns, cap <= 5)',
+    ['puppeteer', 'vesper', 'archive', 'lastshore'].every(id =>
+      byId(id).phases.every(ph => {
+        const sp = ph.patterns.filter(p => p.type === 'spawn');
+        return sp.length === 0 || (ph.patterns.length === 3 && sp.length === 1 && sp[0].max <= 5);
+      })));
+  check('every new charge carries a real dash (speed x dur >= 110, speed <= 190)',
+    NEW.every(id => byId(id).phases.every(ph => ph.patterns.every(p =>
+      p.type !== 'charge' || (p.speed * p.dur >= 110 && p.speed <= 190)))));
+}
+
 // ================= house guards =================
 console.log('--- House guards ---');
 {
@@ -891,8 +912,8 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.16', APP.includes("const BUILD = '2026.11.16'"));
-  check('app.js update log leads with HONEST DASH', APP.includes("tag: 'HONEST DASH'") && APP.indexOf("tag: 'HONEST DASH'") < APP.indexOf("tag: 'ROUND ANNOUNCER'"));
+  check('app.js pins BUILD 2026.11.17', APP.includes("const BUILD = '2026.11.17'"));
+  check('app.js update log leads with FULL BENCH', APP.includes("tag: 'FULL BENCH'") && APP.indexOf("tag: 'FULL BENCH'") < APP.indexOf("tag: 'HONEST DASH'"));
   check('app.js logs the ROUND ANNOUNCER entry', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
   check('app.js logs the ROUND VARIETY entry', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
   check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
@@ -906,9 +927,9 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.16 // HONEST DASH', IDX.includes('BUILD 2026.11.16 // CORE BREACH: PIT — HONEST DASH'));
+  check('index.html footer stamps BUILD 2026.11.17 // FULL BENCH', IDX.includes('BUILD 2026.11.17 // CORE BREACH: PIT — FULL BENCH'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110l', busts.length === 7 && busts.every(t => t === '?v=20261110l'), busts.join(','));
+  check('all 7 asset tags bust at 20261110m', busts.length === 7 && busts.every(t => t === '?v=20261110m'), busts.join(','));
   {
     // BROOD TAX data pin: the summon cadence law for the reported boss — the brood phase
     // keeps spawn at most 1-of-3 patterns with the swarm capped at 4.
@@ -952,10 +973,11 @@ console.log('--- House guards ---');
   check('pause toggle reachable while paused (P/Esc before early return)', APP.includes("if (e.key === 'p' || e.key === 'Escape') { if (running && st && !st.over) togglePause(); return; }"));
   check('hub renders the ranked card, ladder, Top 5 and arena roster', IDX.includes('id="rank-card"') && IDX.includes('id="rank-ladder"') && IDX.includes('id="top5"') && IDX.includes('id="roster"'));
   check('app.js draws every boss in the roster',
-    ['gatekeeper', 'bilespitter', 'gnasher', 'cindermite', 'thresher', 'surgeon', 'hive', 'paleherald', 'gloamwarden', 'carrionlaw',
-     'brassherald', 'theauditor', 'tollmaster', 'ledger', 'gravewake', 'cindermaw', 'hollowregent', 'ironchoir', 'theloom', 'dredgewarden',
-     'fathom', 'pressuresaint', 'maelstrom', 'goreprelate', 'nullsovereign', 'marshal', 'theglutton', 'paleleviathan', 'oldwater',
-     'tideunbound']
+    ['gatekeeper', 'bilespitter', 'gnasher', 'cindermite', 'thresher', 'mossback', 'surgeon', 'hive', 'paleherald',
+     'gloamwarden', 'carrionlaw', 'ballast', 'brassherald', 'theauditor', 'tollmaster', 'ledger', 'minter', 'exchequer',
+     'gravewake', 'cindermaw', 'hollowregent', 'ironchoir', 'puppeteer', 'lanternmaw', 'theloom', 'dredgewarden',
+     'fathom', 'undertow', 'pressuresaint', 'maelstrom', 'goreprelate', 'nullsovereign', 'marshal', 'gorget', 'vesper',
+     'theglutton', 'paleleviathan', 'oldwater', 'archive', 'lastshore', 'tideunbound']
       .every(id => APP.includes(`case '${id}'`)));
 }
 
