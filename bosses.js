@@ -102,8 +102,8 @@
       brief: 'Chain-shot volleys and the first real charges. Sidestep, then punish.',
       tint: '#4ac2b8',
       phases: [
-        { until: 1, gap: 1.3, patterns: [shotgun(2, 4, 26, 74, 0.75, 0.55), charge(140, 0.5, 0.8)] },
-        { until: 0.5, gap: 1.1, patterns: [charge(150, 0.55, 0.75), ring(12, 54, 0.8), aimed(3, 18, 78, 0.7)] }
+        { until: 1, gap: 1.3, patterns: [shotgun(2, 4, 26, 74, 0.75, 0.55), charge(140, 0.85, 0.8)] },
+        { until: 0.5, gap: 1.1, patterns: [charge(150, 0.85, 0.75), ring(12, 54, 0.8), aimed(3, 18, 78, 0.7)] }
       ]
     },
 
@@ -114,9 +114,9 @@
       brief: 'Rebuilt for the champion weight class: rotating cutting beams, body charges and a scalpel volley. Dash THROUGH the beam, never away from it.',
       tint: '#ff7a8a',
       phases: [
-        { until: 1, gap: 1.15, patterns: [sweep(58, 2.3, 3, 0.6), charge(165, 0.6, 0.7)] },
-        { until: 0.66, gap: 1.0, patterns: [sweep(60, 2.3, 3, 0.6), charge(170, 0.6, 0.7), aimed(3, 18, 84, 0.6)] },
-        { until: 0.33, gap: 0.9, patterns: [sweep(62, 2.4, 3, 0.55), charge(176, 0.6, 0.65), aimed(4, 20, 86, 0.6)] }
+        { until: 1, gap: 1.15, patterns: [sweep(58, 2.3, 3, 0.6), charge(165, 0.85, 0.7)] },
+        { until: 0.66, gap: 1.0, patterns: [sweep(60, 2.3, 3, 0.6), charge(170, 0.85, 0.7), aimed(3, 18, 84, 0.6)] },
+        { until: 0.33, gap: 0.9, patterns: [sweep(62, 2.4, 3, 0.55), charge(176, 0.85, 0.65), aimed(4, 20, 86, 0.6)] }
       ]
     },
     {
@@ -136,9 +136,9 @@
       brief: 'Every trick in the Tide, one body. Three phases. The last one is angry. The whole silver band is tuned to this fight — it is the anchor.',
       tint: '#8f1f2e',
       phases: [
-        { until: 1, gap: 1.3, patterns: [aimed(5, 26, 86, 0.65), ring(13, 60, 0.7), charge(168, 0.6, 0.75)] },
+        { until: 1, gap: 1.3, patterns: [aimed(5, 26, 86, 0.65), ring(13, 60, 0.7), charge(168, 0.85, 0.75)] },
         { until: 0.66, gap: 1.05, patterns: [sweep(62, 2.2, 3, 0.65), zone(4, 24, 4.5, 0.7), spiral(4, 0.14, 7, 54, 0.6)] },
-        { until: 0.33, gap: 1.0, patterns: [ring(14, 60, 0.7), sweep(60, 2.4, 3, 0.6, 2), charge(176, 0.6, 0.7)], enrage: true }
+        { until: 0.33, gap: 1.0, patterns: [ring(14, 60, 0.7), sweep(60, 2.4, 3, 0.6, 2), charge(176, 0.85, 0.7)], enrage: true }
       ]
     },
     {
@@ -160,7 +160,7 @@
       phases: [
         { until: 1, gap: 1.15, patterns: [zone(3, 22, 4.5, 0.7), sweep(58, 2.2, 3, 0.6)] },
         { until: 0.66, gap: 1.0, patterns: [zone(3, 24, 4, 0.7), aimed(3, 14, 76, 0.7)] },
-        { until: 0.33, gap: 0.9, patterns: [sweep(62, 2.3, 3, 0.6, 2), charge(174, 0.6, 0.7)] }
+        { until: 0.33, gap: 0.9, patterns: [sweep(62, 2.3, 3, 0.6, 2), charge(174, 0.85, 0.7)] }
       ]
     },
     {
@@ -269,9 +269,9 @@
       brief: "The first gate past the champion keeps an empty king. It charges like a verdict and rings like a bell, and there is nothing behind the eyes to reason with.",
       tint: '#9fb0c8',
       phases: [
-        { until: 1, gap: 1.2, patterns: [charge(160, 0.55, 0.75), ring(12, 56, 0.7)] },
-        { until: 0.66, gap: 1.05, patterns: [charge(168, 0.6, 0.7), aimed(3, 16, 78, 0.65), ring(13, 58, 0.65)] },
-        { until: 0.33, gap: 0.95, patterns: [charge(176, 0.6, 0.65), ring(14, 58, 0.6), spiral(3, 0.15, 6, 56, 0.6)], enrage: true }
+        { until: 1, gap: 1.2, patterns: [charge(160, 0.85, 0.75), ring(12, 56, 0.7)] },
+        { until: 0.66, gap: 1.05, patterns: [charge(168, 0.85, 0.7), aimed(3, 16, 78, 0.65), ring(13, 58, 0.65)] },
+        { until: 0.33, gap: 0.95, patterns: [charge(176, 0.85, 0.65), ring(14, 58, 0.6), spiral(3, 0.15, 6, 56, 0.6)], enrage: true }
       ]
     },
     {
@@ -282,7 +282,7 @@
       phases: [
         { until: 1, gap: 1.1, patterns: [sweep(60, 2.3, 3, 0.6, 2), ring(14, 62, 0.6)] },
         { until: 0.66, gap: 0.95, patterns: [sweep(62, 2.4, 3, 0.55, 2), spiral(4, 0.13, 7, 60, 0.55), aimed(4, 22, 86, 0.55)] },
-        { until: 0.33, gap: 0.85, patterns: [sweep(64, 2.5, 3, 0.5, 2), ring(16, 62, 0.55), charge(176, 0.6, 0.6)] }
+        { until: 0.33, gap: 0.85, patterns: [sweep(64, 2.5, 3, 0.5, 2), ring(16, 62, 0.55), charge(176, 0.85, 0.6)] }
       ]
     },
     {
@@ -358,9 +358,9 @@
       brief: 'Every trick in the Tide, one crown, no mercy. The king holds the crimson gate.',
       tint: '#e0b23c',
       phases: [
-        { until: 1, gap: 1.2, patterns: [aimed(3, 20, 80, 0.7), ring(13, 60, 0.65), charge(168, 0.6, 0.7)] },
+        { until: 1, gap: 1.2, patterns: [aimed(3, 20, 80, 0.7), ring(13, 60, 0.65), charge(168, 0.85, 0.7)] },
         { until: 0.75, gap: 1.05, patterns: [sweep(60, 2.3, 3, 0.6, 2), zone(3, 22, 4.5, 0.65), spiral(4, 0.14, 7, 56, 0.6)] },
-        { until: 0.5, gap: 1.05, patterns: [ring(12, 60, 0.65), shotgun(2, 4, 24, 74, 0.75, 0.5), spawn(2, 4, 0.6), charge(172, 0.6, 0.7)] },
+        { until: 0.5, gap: 1.05, patterns: [ring(12, 60, 0.65), shotgun(2, 4, 24, 74, 0.75, 0.5), spawn(2, 4, 0.6), charge(172, 0.85, 0.7)] },
         { until: 0.25, gap: 0.9, patterns: [sweep(58, 2.5, 3, 0.55, 2), spiral(3, 0.15, 6, 56, 0.6), spawn(2, 6, 0.55)], enrage: true }
       ]
     },
@@ -370,9 +370,9 @@
       brief: "The crimson court keeps its own law. Verdict shotguns and sentence charges — the axe falls faster every phase, and the last one is angry.",
       tint: '#c93c50',
       phases: [
-        { until: 1, gap: 1.1, patterns: [shotgun(2, 4, 24, 74, 0.7, 0.5), charge(164, 0.6, 0.7)] },
+        { until: 1, gap: 1.1, patterns: [shotgun(2, 4, 24, 74, 0.7, 0.5), charge(164, 0.85, 0.7)] },
         { until: 0.66, gap: 1.0, patterns: [sweep(60, 2.3, 3, 0.6), shotgun(2, 4, 26, 76, 0.65, 0.5), ring(12, 58, 0.65)] },
-        { until: 0.33, gap: 0.9, patterns: [charge(174, 0.6, 0.65), spiral(4, 0.13, 7, 58, 0.6), ring(13, 58, 0.6)], enrage: true }
+        { until: 0.33, gap: 0.9, patterns: [charge(174, 0.85, 0.65), spiral(4, 0.13, 7, 58, 0.6), ring(13, 58, 0.6)], enrage: true }
       ]
     },
     {

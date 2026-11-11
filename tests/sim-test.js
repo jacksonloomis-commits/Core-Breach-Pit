@@ -85,9 +85,16 @@ function botInput(st) {
           if (bd > 30 && ad < half + 0.14) danger += (half + 0.14 - ad) * 38 * (horizon < 0.3 ? 1 : 0.5);
         }
         if (rt.pat.type === 'charge') {
+          // HONEST DASH: the line shows the real path now, so read it — the segment
+          // boss -> wall-clamped endpoint, weighted like the cone (a bot that treats
+          // a 140px dash like the old 3px stub eats charges no human would)
           const aim = rt.data.aim;
-          const dd = pointLineDist(px, py, st.boss.x, st.boss.y, st.boss.x + Math.cos(aim) * 400, st.boss.y + Math.sin(aim) * 400);
-          if (dd < 13) danger += (13 - dd) * 3;
+          const enr = st.bossDef.phases[st.boss.phase].enrage ? 1.15 : 1;
+          const travel = rt.pat.speed * rt.pat.dur * enr;
+          const ex = clamp(st.boss.x + Math.cos(aim) * travel, AR.x0 + st.boss.r, AR.x1 - st.boss.r);
+          const ey = clamp(st.boss.y + Math.sin(aim) * travel, AR.y0 + st.boss.r, AR.y1 - st.boss.r);
+          const dd = pointLineDist(px, py, st.boss.x, st.boss.y, ex, ey);
+          if (dd < 14) danger += (14 - dd) * 6;
         }
       }
       if (st.beams.length && rt.pat && rt.pat.type === 'sweep') {
@@ -98,6 +105,14 @@ function botInput(st) {
         }
       }
       for (const m of st.minions) { const md = Math.hypot(m.x - px, m.y - py); if (md < 22) danger += (22 - md) * 1.6; }
+      if (rt.mode === 'active' && rt.pat && rt.pat.type === 'charge') {
+        // the dash is REAL: fear where the boss WILL be at the horizon, not where it is
+        const enr = st.bossDef.phases[st.boss.phase].enrage ? 1.15 : 1;
+        const bx2 = clamp(st.boss.x + Math.cos(rt.data.aim) * rt.pat.speed * enr * horizon, AR.x0 + st.boss.r, AR.x1 - st.boss.r);
+        const by2 = clamp(st.boss.y + Math.sin(rt.data.aim) * rt.pat.speed * enr * horizon, AR.y0 + st.boss.r, AR.y1 - st.boss.r);
+        const pd = Math.hypot(bx2 - px, by2 - py);
+        if (pd < st.boss.r + 10) danger += (st.boss.r + 10 - pd) * 5;
+      }
       const bd = Math.hypot(st.boss.x - px, st.boss.y - py);
       if (bd < st.boss.r + 12) danger += (st.boss.r + 12 - bd) * 3;
       // soft edges (weight 1.1: the bot once camped walls and ate volleys there — no human does)
@@ -819,6 +834,55 @@ console.log('--- Fuzz ---');
   check('random-input fuzz across all 31 bosses: no crash', !crashed);
 }
 
+// ================= charge honesty (owner report: "they only move like an inch") =================
+console.log('--- Charge honesty ---');
+{
+  // the regression: execPattern(st, 0) fires on the tele->active transition to spawn
+  // first-frame bullets; the charge case ran its wall-stop check on that dt=0 call and
+  // clamped every charge timer to 0.01 — one frame of movement, then recover.
+  const charges = [];
+  BOSSES.LIST.forEach((b, i) => b.phases.forEach(ph => ph.patterns.forEach(p => {
+    if (p.type === 'charge') charges.push({ b, p });
+  })));
+  check(`every charge in the roster carries a real dash (16 patterns, speed x dur >= 110; found ${charges.length})`,
+    charges.length === 16 && charges.every(c => c.p.speed * c.p.dur >= 110));
+  check('charge speed stays under the fairness cap (190)', charges.every(c => c.p.speed <= 190));
+  {
+    // natural-transition travel: put the boss mid-arena, let the ENGINE do the
+    // tele->active handoff, measure the dash along the locked aim (runway clear)
+    const idx = BOSSES.LIST.findIndex(b => b.id === 'deathwarrant');
+    const st = PIT.createRun({ boss: idx, charId: 'volt', seed: 43 });
+    const pat = st.bossDef.phases[0].patterns.find(p => p.type === 'charge');
+    st.boss.x = 140; st.boss.y = 100; // right aim: runway to the x1 wall = 162px > planned 143
+    st.boss.rt = { mode: 'tele', timer: 0.01, pat, patIdx: 0, data: { aim: 0 }, spawned: 0, sub: 0 };
+    let steps = 0;
+    while (st.boss.rt.mode !== 'active' && steps++ < 600) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const sx = st.boss.x;
+    let activeSteps = 0;
+    while (st.boss.rt.mode === 'active' && activeSteps++ < 600) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const moved = st.boss.x - sx;
+    check(`a charge runs its FULL dash through the natural transition (${Math.round(moved)}px of planned ${Math.round(pat.speed * pat.dur)})`,
+      moved >= pat.speed * pat.dur * 0.95);
+    check('the active window lasts the pattern duration (not the dt=0 poisoned 0.01s)',
+      activeSteps >= Math.floor(pat.dur * 60) - 2, activeSteps + ' steps');
+  }
+  {
+    // the dt=0 call itself must be a no-op for movement: transitioning while the boss
+    // already sits at a wall must NOT kill the charge of a LATER pattern run
+    const idx = BOSSES.LIST.findIndex(b => b.id === 'thresher');
+    const st = PIT.createRun({ boss: idx, charId: 'volt', seed: 44 });
+    const pat = st.bossDef.phases[1].patterns.find(p => p.type === 'charge');
+    st.boss.x = 160; st.boss.y = 100;
+    st.boss.rt = { mode: 'tele', timer: 0.01, pat, patIdx: 0, data: { aim: Math.PI }, spawned: 0, sub: 0 };
+    let steps = 0;
+    while (st.boss.rt.mode !== 'active' && steps++ < 600) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const sx = st.boss.x;
+    while (st.boss.rt.mode === 'active') PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    check('leftward charge from mid-arena covers its planned distance (no one-frame stub)',
+      sx - st.boss.x >= pat.speed * pat.dur * 0.9, Math.round(sx - st.boss.x) + 'px');
+  }
+}
+
 // ================= house guards =================
 console.log('--- House guards ---');
 {
@@ -827,8 +891,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.15', APP.includes("const BUILD = '2026.11.15'"));
-  check('app.js update log leads with ROUND ANNOUNCER', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
+  check('app.js pins BUILD 2026.11.16', APP.includes("const BUILD = '2026.11.16'"));
+  check('app.js update log leads with HONEST DASH', APP.includes("tag: 'HONEST DASH'") && APP.indexOf("tag: 'HONEST DASH'") < APP.indexOf("tag: 'ROUND ANNOUNCER'"));
+  check('app.js logs the ROUND ANNOUNCER entry', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
   check('app.js logs the ROUND VARIETY entry', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
   check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
   check('app.js logs the PHASE FURY entry', APP.includes("tag: 'PHASE FURY'"));
@@ -841,9 +906,9 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.15 // ROUND ANNOUNCER', IDX.includes('BUILD 2026.11.15 // CORE BREACH: PIT — ROUND ANNOUNCER'));
+  check('index.html footer stamps BUILD 2026.11.16 // HONEST DASH', IDX.includes('BUILD 2026.11.16 // CORE BREACH: PIT — HONEST DASH'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110k', busts.length === 7 && busts.every(t => t === '?v=20261110k'), busts.join(','));
+  check('all 7 asset tags bust at 20261110l', busts.length === 7 && busts.every(t => t === '?v=20261110l'), busts.join(','));
   {
     // BROOD TAX data pin: the summon cadence law for the reported boss — the brood phase
     // keeps spawn at most 1-of-3 patterns with the swarm capped at 4.
@@ -857,6 +922,11 @@ console.log('--- House guards ---');
   check('engine carries the PHASE FURY aggression curve and burst ring', ENG.includes('const AGGRO') && ENG.includes("kind: 'phase'") && ENG.includes('aggroAt('));
   check('engine carries the ROUND VARIETY mutator deck and the summon-cadence guard',
     ENG.includes('const MUTATORS') && ENG.includes('MUTATORS NEVER TOUCH SPAWN COUNTS OR CAPS') && ENG.includes('function rollMutators'));
+  check('charge movement guards against the dt=0 transition call (the one-frame dash regression)',
+    ENG.includes('if (dt > 0) {') && ENG.includes('pinned at a wall, stop early') && ENG.includes('MUST be a no-op'));
+  check('the charge telegraph draws the honest planned path (no 400px fantasy line)',
+    APP.includes('pat.speed * pat.dur * enr') && APP.includes('PIT.clamp(b.x + Math.cos(b.rt.data.aim) * travel') &&
+    !APP.includes('Math.cos(b.rt.data.aim) * 400'));
   check('app.js renders the mutator draw in the fight title and results',
     APP.includes('rankName: rk.name') && APP.includes("'MUTATORS: '"));
   check('multipliers reach the UI only through fmtMul (no raw float interpolation in the title/ladder)',

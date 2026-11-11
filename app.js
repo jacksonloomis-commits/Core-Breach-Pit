@@ -1,8 +1,12 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.15';
+  const BUILD = '2026.11.16';
   const UPDATE_LOG = [
+    { version: '2026.11.16', tag: 'HONEST DASH', items: [
+      'FIXED (owner report: the dotted red line is supposed to be a dash but the boss only moves like an inch): a first-frame timing bug clamped EVERY charge in the game to 0.01s before it even started — the dash you were promised never happened. Charges now run their full dash (~120-150px, angry phases faster), and a body hit from a charging lieutenant still hurts',
+      'THE DASHED LINE TELLS THE TRUTH NOW: it shows the EXACT path the boss will charge — same length as the real dash, cut off honestly at a wall, with a stop marker where the boss will land. Read the line, step aside, punish the recovery'
+    ] },
     { version: '2026.11.15', tag: 'ROUND ANNOUNCER', items: [
       'THE TWISTS MAKE THEIR ENTRANCE (owner spec): every queue now opens with a five-second countdown that names the boss and every mutator it rolled, with exactly what each one does — read the draw, plan the fight, then FIGHT',
       'NO MORE 1.0999000000099999 (owner report): composed multipliers printed raw floating-point garbage. Every multiplier the game shows — fight title, ladder, announcer — is rounded clean now'
@@ -441,12 +445,23 @@
       }
       cx.globalAlpha = 1;
     }
-    // telegraph: charge line
+    // telegraph: charge line — HONEST (owner report: the dashed line promised a huge
+    // dash while the boss barely moved). It now draws the EXACT planned path: speed x
+    // dur x enrage from the boss's position along the locked aim, clamped to the walls
+    // by the same clamp the engine's charge uses, plus a stop marker at the endpoint.
     if (b.rt.mode === 'tele' && b.rt.pat && b.rt.pat.type === 'charge') {
+      const pat = b.rt.pat;
+      const enr = st.bossDef.phases[st.boss.phase].enrage ? 1.15 : 1;
+      const travel = pat.speed * pat.dur * enr;
+      const ex = Math.round(PIT.clamp(b.x + Math.cos(b.rt.data.aim) * travel, PIT.AR.x0 + b.r, PIT.AR.x1 - b.r));
+      const ey = Math.round(PIT.clamp(b.y + Math.sin(b.rt.data.aim) * travel, PIT.AR.y0 + b.r, PIT.AR.y1 - b.r));
       cx.strokeStyle = C.crimlite; cx.setLineDash([3, 3]); cx.globalAlpha = 0.7;
       cx.beginPath(); cx.moveTo(b.x, b.y);
-      cx.lineTo(b.x + Math.cos(b.rt.data.aim) * 400, b.y + Math.sin(b.rt.data.aim) * 400);
+      cx.lineTo(ex, ey);
       cx.stroke(); cx.setLineDash([]); cx.globalAlpha = 1;
+      // the charge ends here — the boss will be sitting on this square
+      px(ex - 2, ey - 2, 4, 4, C.crimdark);
+      px(ex - 1, ey - 1, 2, 2, C.crimlite);
     }
 
     // zones (bile pools)

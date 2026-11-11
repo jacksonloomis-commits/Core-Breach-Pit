@@ -233,12 +233,20 @@
         break;
       }
       case 'charge': {
-        const sp = pat.speed * (st.bossDef.phases[st.boss.phase].enrage ? 1.15 : 1);
-        const vx = Math.cos(rt.data.aim) * sp, vy = Math.sin(rt.data.aim) * sp;
-        const nx = clamp(b.x + vx * dt, AR.x0 + b.r, AR.x1 - b.r);
-        const ny = clamp(b.y + vy * dt, AR.y0 + b.r, AR.y1 - b.r);
-        if (nx === b.x && ny === b.y) rt.timer = Math.min(rt.timer, 0.01); // hit a wall, stop early
-        b.x = nx; b.y = ny;
+        // The transition into 'active' fires execPattern(st, 0) to spawn first-frame
+        // bullets for shot patterns. For movement patterns that call MUST be a no-op:
+        // with dt=0 nothing moves, and running the wall-stop check on it would clamp
+        // the charge timer to 0.01 — every charge in the game died after one frame
+        // (owner report 2026.11.16: "the dotted red line ... they only move like an
+        // inch"). Guard the movement on dt > 0.
+        if (dt > 0) {
+          const sp = pat.speed * (st.bossDef.phases[st.boss.phase].enrage ? 1.15 : 1);
+          const vx = Math.cos(rt.data.aim) * sp, vy = Math.sin(rt.data.aim) * sp;
+          const nx = clamp(b.x + vx * dt, AR.x0 + b.r, AR.x1 - b.r);
+          const ny = clamp(b.y + vy * dt, AR.y0 + b.r, AR.y1 - b.r);
+          if (nx === b.x && ny === b.y) rt.timer = Math.min(rt.timer, 0.01); // pinned at a wall, stop early
+          b.x = nx; b.y = ny;
+        }
         break;
       }
       case 'zone': {

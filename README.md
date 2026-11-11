@@ -45,6 +45,12 @@ Every queue opens with a **five-second countdown** before the gates open: the ra
 
 And no more floating-point garbage: composed multipliers (rank preset × mutator effects) used to print raw products like `1.0999000000099999`. Every multiplier the game shows — fight title, ladder rows, announcer — goes through `fmtMul` in `engine.js`, which rounds to three decimals and prints the shortest clean string (`1.1`, `0.972`, `1.25`).
 
+## The charge tells the truth — HONEST DASH
+
+A charge telegraphs as a dashed red line, and the line is now **honest**: it shows the exact path the boss will dash — same length as the real dash, cut off cleanly at a wall — with a **stop marker** where the boss will land. The dash itself is real: ~120-150 px of ground eaten in under a second (angry phases faster), and the body hit still hurts. Read the line, step aside, punish the recovery.
+
+Ships with a regression fix the owner caught by eye: a first-frame timing bug clamped every charge in the game to 0.01 s before it started, so the boss moved ~3 px ("like an inch") no matter what the line promised. The engine's transition call `execPattern(st, 0)` (dt = 0, first-frame bullet spawn) is now a documented **no-op contract for movement patterns** — charge movement guards on `dt > 0`, and the suite pins full-dash travel through the natural transition plus a roster-wide floor (speed × dur ≥ 110, speed ≤ 190).
+
 ## Boss phases get angry — PHASE FURY
 
 Phases are not a pattern swap. Every phase the whole fight escalates on one engine-side curve (`AGGRO` in `engine.js`): patterns cycle sooner (gaps and recover compress), telegraphs snap a beat tighter (never below the 0.5 s fairness floor), and **every projectile leaves faster**. Enrage final phases stack a last-stand multiplier on top of the curve. And the transition itself answers you: the fairness wipe ends with a **gold retaliation ring** bursting out of the boss — slower than your run speed, so you can walk through it, but it will catch you standing still.
@@ -95,6 +101,6 @@ Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, 
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.15 // ROUND ANNOUNCER** (bust `20261110k`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.16 // HONEST DASH** (bust `20261110l`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).
