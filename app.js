@@ -1,8 +1,13 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.17';
+  const BUILD = '2026.11.18';
   const UPDATE_LOG = [
+    { version: '2026.11.18', tag: 'SIGNATURE WAVE', items: [
+      'EVERY BOSS HAS A SIGNATURE NOW (owner spec: "a lot of these bosses have the same gimmick ... every boss should feel a little unique"): all 42 lieutenants carry a named, test-pinned signature gimmick — the round announcer shows it before the gates open and the hub roster lists it on every card. Sharing attacks is fine; nobody shares an identity',
+      'NINE NEW MECHANICS WERE BUILT FOR IT: homing seek drift (MOSSBACK, VESPER, PALE LEVIATHAN), proximity mines (CINDERMITE, THE LEDGER, LANTERN MAW), orbiting halos that burst outward (PALE HERALD, THE MINTER, MAELSTROM), flood walls with one gap (GLOAMWARDEN, THE LOOM, THE LAST SHORE), mortar shells (CARRION LAW, DREDGEWARDEN), a vortex pull (THE BALLAST, THE UNDERTOW), pinned marks that bill your square (THE AUDITOR, PRESSURE SAINT, THE ABYSSAL ARCHIVE), a teleport step with an arrival clap (THE PUPPETEER, NULL SOVEREIGN), wall-ricochet slugs (THE GORGET), and bile pools that bloom wider while they live (BILESPITTER, CINDERMAW)',
+      'THE AUDIT ALSO CAUGHT TWO OLD LAWS BEING BROKEN: THE UNDERTOW\'S pull was capped to the escapable force, and THE GLUTTON\'s finale was quietly pairing its brood spawn with floor pools — the exact herding pair the VESPER lesson forbids. Both patterns fixed, every boss re-proven at its gate'
+    ] },
     { version: '2026.11.17', tag: 'FULL BENCH', items: [
       'THE ROSTER GOES 31 -> 42 (owner spec: "add a boss or two more to each Arena for even more variety"): every arena bench is stocked — MOSSBACK joins the bronze warm-up, THE BALLAST the DEATHWARRANT area, THE MINTER + THE EXCHEQUER the tax office, THE PUPPETEER + LANTERN MAW the platinum gate, THE UNDERTOW the diamond deep, THE GORGET + VESPER the crimson court, and THE ABYSSAL ARCHIVE + THE LAST SHORE (both four phases) the iridescent endgame. Bronze rolls six, silver seven, the rest five or six — no more four-boss arenas',
       'EVERY NEW BODY IS BOT-PROVEN 3/3 AT ITS GATE: MOSSBACK at the BRONZE preset (VOLT), THE BALLAST at SILVER, THE MINTER + THE EXCHEQUER at GOLD, the seven beyond lieutenants at base (BULWARK) — and every existing gate re-proven with the deeper pools',
@@ -193,7 +198,7 @@
       rk.pool.forEach((bi) => {
         const b = BOSSES.LIST[bi];
         const card = el('div', 'roster-boss');
-        card.innerHTML = `<span class="rb-name" style="color:${b.tint}">${b.name}</span><span class="rb-title">${b.title}</span><span class="rb-hp">${b.hp} HP</span><div class="rb-brief">${b.brief}</div>`;
+        card.innerHTML = `<span class="rb-name" style="color:${b.tint}">${b.name}</span><span class="rb-title">${b.title}</span><span class="rb-hp">${b.hp} HP</span>${b.sig ? `<span class="rb-sig">SIG · ${b.sig.name}</span>` : ''}<div class="rb-brief">${b.brief}</div>`;
         roster.appendChild(card);
       });
     }
@@ -261,6 +266,13 @@
     bossEl.textContent = st.bossDef.name;
     bossEl.style.color = st.bossDef.tint;
     $('#ready-brief').textContent = `${st.bossDef.title} · ${st.boss.maxHp} HP at this pacing`;
+    // SIGNATURE WAVE: the announcer names the boss's signature gimmick before the
+    // gates open — read what makes THIS lieutenant different, then plan the fight
+    const sigEl = $('#ready-sig');
+    if (st.bossDef.sig) {
+      sigEl.hidden = false;
+      sigEl.innerHTML = `<span class="rsig-name" style="color:${st.bossDef.tint}">SIGNATURE — ${st.bossDef.sig.name}</span><span class="rsig-blurb">${st.bossDef.sig.blurb}</span>`;
+    } else sigEl.hidden = true;
     const mrow = $('#ready-muts');
     mrow.innerHTML = '';
     if (st.mutators.length) {
@@ -440,14 +452,59 @@
     if (!st) return;
     const p = st.player, b = st.boss;
 
-    // telegraphs: zone spot outlines
-    if (b.rt.mode === 'tele' && b.rt.pat && b.rt.pat.type === 'zone') {
-      cx.strokeStyle = '#9ae66e'; cx.lineWidth = 1;
+    // telegraphs: zone spot outlines — and the SIGNATURE WAVE floor telegraphs
+    // (mark reticles, mine spots, mortar targets), each drawn from the SAME
+    // rt.data the engine planned at telegraph start
+    if (b.rt.mode === 'tele' && b.rt.pat && (b.rt.pat.type === 'zone' || b.rt.pat.type === 'mines' || b.rt.pat.type === 'mortar')) {
+      const col = b.rt.pat.type === 'zone' ? '#9ae66e' : C.amber;
+      cx.strokeStyle = col; cx.lineWidth = 1;
       const pulse = 0.5 + 0.5 * Math.sin(st.t * 12);
       for (const s of b.rt.data.spots) {
         cx.globalAlpha = 0.3 + 0.5 * pulse;
         cx.strokeRect(s.x - b.rt.pat.r, s.y - b.rt.pat.r, b.rt.pat.r * 2, b.rt.pat.r * 2);
       }
+      cx.globalAlpha = 1;
+    }
+    if (b.rt.mode === 'tele' && b.rt.pat && b.rt.pat.type === 'mark') {
+      // THE AUDIT / PILGRIM MARK / DOCUMENTED: a reticle on the square you stand on
+      const pulse = 0.5 + 0.5 * Math.sin(st.t * 14);
+      cx.strokeStyle = C.crimlite; cx.globalAlpha = 0.4 + 0.5 * pulse;
+      for (const s of b.rt.data.spots) {
+        cx.strokeRect(s.x - b.rt.pat.r, s.y - b.rt.pat.r, b.rt.pat.r * 2, b.rt.pat.r * 2);
+        cx.beginPath();
+        cx.moveTo(s.x - b.rt.pat.r - 3, s.y); cx.lineTo(s.x + b.rt.pat.r + 3, s.y);
+        cx.moveTo(s.x, s.y - b.rt.pat.r - 3); cx.lineTo(s.x, s.y + b.rt.pat.r + 3);
+        cx.stroke();
+      }
+      cx.globalAlpha = 1;
+    }
+    if (b.rt.mode === 'tele' && b.rt.pat && b.rt.pat.type === 'blink') {
+      // MARIONETTE / KING'S STEP: a ghost where the body will land — it lands where shown
+      const d = b.rt.data.dest;
+      cx.strokeStyle = C.crimlite; cx.setLineDash([3, 3]); cx.globalAlpha = 0.5 + 0.4 * Math.sin(st.t * 10);
+      cx.strokeRect(d.x - b.r - 2, d.y - b.r - 2, (b.r + 2) * 2, (b.r + 2) * 2);
+      cx.setLineDash([]); cx.globalAlpha = 1;
+    }
+    if (b.rt.mode === 'tele' && b.rt.pat && b.rt.pat.type === 'wall') {
+      // the honest curtain: the row it will spawn along, with the gap drawn wide open
+      const edge = b.rt.data.edge, gap = b.rt.data.gap, gw = b.rt.pat.gapW / 2;
+      cx.strokeStyle = C.tealite; cx.setLineDash([4, 3]); cx.globalAlpha = 0.75;
+      cx.beginPath();
+      const seg = (a1, a2) => {
+        if (a2 <= a1) return;
+        if (edge === 0) { cx.moveTo(a1, PIT.AR.y0 + 3); cx.lineTo(a2, PIT.AR.y0 + 3); }
+        else if (edge === 1) { cx.moveTo(a1, PIT.AR.y1 - 3); cx.lineTo(a2, PIT.AR.y1 - 3); }
+        else if (edge === 2) { cx.moveTo(PIT.AR.x0 + 3, a1); cx.lineTo(PIT.AR.x0 + 3, a2); }
+        else { cx.moveTo(PIT.AR.x1 - 3, a1); cx.lineTo(PIT.AR.x1 - 3, a2); }
+      };
+      if (edge < 2) { seg(PIT.AR.x0, gap - gw); seg(gap + gw, PIT.AR.x1); }
+      else { seg(PIT.AR.y0, gap - gw); seg(gap + gw, PIT.AR.y1); }
+      cx.stroke(); cx.setLineDash([]); cx.globalAlpha = 1;
+    }
+    if (b.rt.mode === 'tele' && b.rt.pat && b.rt.pat.type === 'orbit') {
+      // the halo's track: a faint circle at the radius the bullets will ride
+      cx.strokeStyle = C.gold; cx.globalAlpha = 0.3 + 0.2 * Math.sin(st.t * 10);
+      cx.beginPath(); cx.arc(b.x, b.y, b.rt.pat.radius, 0, Math.PI * 2); cx.stroke();
       cx.globalAlpha = 1;
     }
     // telegraph: charge line — HONEST (owner report: the dashed line promised a huge
@@ -487,8 +544,34 @@
       cx.restore();
     }
 
-    // projectiles — phase-ring bullets are gold so the retaliation ring reads instantly
-    for (const q of st.proj) px(q.x - q.r, q.y - q.r, q.r * 2, q.r * 2, q.kind === 'phase' ? C.gold : C.crimlite);
+    // projectiles — kind-tagged so every signature reads at a glance: phase rings gold,
+    // seekers purple, shells + bursts amber, curtains teal, halos gold, ricochets steel
+    const KIND_COL = { phase: C.gold, seek: C.purple, shell: C.amber, pop: C.amber, wall: C.tealite, orb: C.gold, clap: C.white, ric: C.gray };
+    for (const q of st.proj) px(q.x - q.r, q.y - q.r, q.r * 2, q.r * 2, KIND_COL[q.kind] || C.crimlite);
+
+    // armed signature marks: mines blink amber, pinned reticles hold crimson
+    for (const mk of st.marks) {
+      const blinkOn = Math.floor(st.t * 8) % 2 === 0;
+      if (mk.mine) {
+        if (blinkOn) px(mk.x - 2, mk.y - 2, 4, 4, C.amber);
+        px(mk.x - mk.r, mk.y - mk.r, mk.r * 2, 1, '#5a4a20');
+        px(mk.x - mk.r, mk.y + mk.r, mk.r * 2, 1, '#5a4a20');
+      } else {
+        cx.strokeStyle = C.crimlite; cx.globalAlpha = blinkOn ? 0.9 : 0.5;
+        cx.strokeRect(mk.x - mk.r, mk.y - mk.r, mk.r * 2, mk.r * 2);
+        cx.globalAlpha = 1;
+      }
+    }
+
+    // the vortex: while a pull reads, a ring closes on the runner being dragged
+    if ((b.rt.mode === 'tele' || b.rt.mode === 'active') && b.rt.pat && b.rt.pat.type === 'pull') {
+      const pr = 14 + 6 * Math.sin(st.t * 6);
+      cx.strokeStyle = C.tealite; cx.globalAlpha = 0.55;
+      cx.beginPath(); cx.arc(p.x, p.y, pr, 0, Math.PI * 2); cx.stroke();
+      cx.globalAlpha = 0.3;
+      cx.beginPath(); cx.arc(p.x, p.y, pr + 8, 0, Math.PI * 2); cx.stroke();
+      cx.globalAlpha = 1;
+    }
 
     // minions
     for (const m of st.minions) {

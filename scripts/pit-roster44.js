@@ -1,7 +1,8 @@
-// FULL BENCH probe — gate the 2026.11.17 additions exactly like the suite gates
-// them (VOLT at bronze/silver/gold presets, BULWARK at base for beyond), with
-// per-hit diagnostics on failure: which phase, which damage source, where.
-// Usage: node scripts/pit-roster44.js [bossId ...]   (default: all eleven)
+// FULL BENCH probe — gate the roster exactly like the suite gates it (VOLT at
+// bronze/silver/gold presets, BULWARK at base for beyond), with per-hit diagnostics
+// on failure: which phase, which damage source, where. Since SIGNATURE WAVE touched
+// every boss, the default gate list is now the WHOLE 42.
+// Usage: node scripts/pit-roster44.js [bossId ...]   (default: all 42)
 const PIT = require('../engine.js');
 const BOSSES = require('../bosses.js');
 
@@ -35,6 +36,7 @@ function immediateDanger(st) {
     if (dd < 12) danger += 30;
   }
   for (const z of st.zones) if (st.t < z.until && Math.hypot(z.x - p.x, z.y - p.y) < z.r) danger += 40;
+  for (const mk of st.marks) if (Math.hypot(mk.x - p.x, mk.y - p.y) < mk.r + 4) danger += 30; // mines burst when crowded
   for (const m of st.minions) { const md = Math.hypot(m.x - p.x, m.y - p.y); if (md < 16) danger += (16 - md) * 2.5; }
   if (Math.hypot(st.boss.x - p.x, st.boss.y - p.y) < st.boss.r + 8) danger += 30;
   return danger;
@@ -57,9 +59,27 @@ function botInput(st) {
         else if (d < 26) danger += 1;
       }
       for (const z of st.zones) if (st.t < z.until && Math.hypot(z.x - px, z.y - py) < z.r + 5) danger += 45;
+      for (const mk of st.marks) if (Math.hypot(mk.x - px, mk.y - py) < mk.r + 6) danger += 45;
+      for (const q of st.proj) if (q.tx !== undefined && Math.hypot(q.tx - px, q.ty - py) < 26) danger += 18; // shells pop there
       const rt = st.boss.rt;
       if (rt.mode === 'tele' && rt.pat) {
         if (rt.pat.type === 'zone') for (const s of rt.data.spots) if (Math.hypot(s.x - px, s.y - py) < rt.pat.r + 4) danger += 45;
+        // SIGNATURE floor telegraphs: mines / mortar targets / pinned marks pre-plan
+        // their spots at telegraph start — read them exactly like pool outlines
+        if (rt.pat.type === 'mines' || rt.pat.type === 'mortar' || rt.pat.type === 'mark') {
+          for (const s of rt.data.spots) if (Math.hypot(s.x - px, s.y - py) < rt.pat.r + 6) danger += 45;
+        }
+        if (rt.pat.type === 'blink' && rt.data.dest) {
+          // the ghost shows where the body lands — do not stand on the landing square
+          const dd = Math.hypot(rt.data.dest.x - px, rt.data.dest.y - py);
+          if (dd < st.boss.r + 16) danger += (st.boss.r + 16 - dd) * 4;
+        }
+        if (rt.pat.type === 'wall') {
+          // a curtain with one gap: drift toward the gap band while it reads
+          const along = rt.data.edge < 2 ? px : py;
+          const dg = Math.abs(along - rt.data.gap) - rt.pat.gapW / 2;
+          if (dg > 0) danger += Math.min(16, dg * 0.5);
+        }
         if (rt.pat.type === 'aimed' || rt.pat.type === 'shotgun') {
           const aim = rt.data.aim, half = ((rt.pat.spread * Math.PI) / 180) / 2;
           const ang = Math.atan2(py - st.boss.y, px - st.boss.x);
@@ -76,6 +96,12 @@ function botInput(st) {
           const dd = pointLineDist(px, py, st.boss.x, st.boss.y, ex, ey);
           if (dd < 14) danger += (14 - dd) * 6;
         }
+      }
+      if (st.wallSig && st.t < st.wallSig.until) {
+        // the curtain still marches after its pattern ended — keep seeking the gap
+        const along = st.wallSig.edge < 2 ? px : py;
+        const dg = Math.abs(along - st.wallSig.gap) - st.wallSig.gw / 2;
+        if (dg > 0) danger += Math.min(20, dg * 0.6);
       }
       if (st.beams.length && rt.pat && rt.pat.type === 'sweep') {
         for (const beam of st.beams) {
@@ -140,17 +166,17 @@ function runFight(boss, charId, seed, capSec, opts = {}) {
 }
 
 const GATES = [
-  { id: 'mossback', charId: 'volt', mods: PIT.RANK_MODS.BRONZE, label: 'BRONZE preset' },
-  { id: 'ballast', charId: 'volt', mods: PIT.RANK_MODS.SILVER, label: 'SILVER preset' },
-  { id: 'minter', charId: 'volt', mods: PIT.RANK_MODS.GOLD, label: 'GOLD preset' },
-  { id: 'exchequer', charId: 'volt', mods: PIT.RANK_MODS.GOLD, label: 'GOLD preset' },
-  { id: 'puppeteer', charId: 'bulwark', mods: null, label: 'base (BULWARK)' },
-  { id: 'lanternmaw', charId: 'bulwark', mods: null, label: 'base (BULWARK)' },
-  { id: 'undertow', charId: 'bulwark', mods: null, label: 'base (BULWARK)' },
-  { id: 'gorget', charId: 'bulwark', mods: null, label: 'base (BULWARK)' },
-  { id: 'vesper', charId: 'bulwark', mods: null, label: 'base (BULWARK)' },
-  { id: 'archive', charId: 'bulwark', mods: null, label: 'base (BULWARK)' },
-  { id: 'lastshore', charId: 'bulwark', mods: null, label: 'base (BULWARK)' }
+  ...['gatekeeper', 'bilespitter', 'gnasher', 'cindermite', 'thresher', 'mossback']
+    .map(id => ({ id, charId: 'volt', mods: PIT.RANK_MODS.BRONZE, label: 'BRONZE preset' })),
+  ...['surgeon', 'hive', 'deathwarrant', 'paleherald', 'gloamwarden', 'carrionlaw', 'ballast']
+    .map(id => ({ id, charId: 'volt', mods: PIT.RANK_MODS.SILVER, label: 'SILVER preset' })),
+  ...['brassherald', 'theauditor', 'tollmaster', 'ledger', 'minter', 'exchequer']
+    .map(id => ({ id, charId: 'volt', mods: PIT.RANK_MODS.GOLD, label: 'GOLD preset' })),
+  ...['gravewake', 'cindermaw', 'hollowregent', 'ironchoir', 'puppeteer', 'lanternmaw',
+      'theloom', 'dredgewarden', 'fathom', 'undertow', 'pressuresaint', 'maelstrom',
+      'goreprelate', 'nullsovereign', 'marshal', 'gorget', 'vesper', 'theglutton',
+      'paleleviathan', 'oldwater', 'archive', 'lastshore', 'tideunbound']
+    .map(id => ({ id, charId: 'bulwark', mods: null, label: 'base (BULWARK)' }))
 ];
 
 const filter = process.argv.slice(2);

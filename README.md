@@ -45,6 +45,14 @@ Every queue opens with a **five-second countdown** before the gates open: the ra
 
 And no more floating-point garbage: composed multipliers (rank preset × mutator effects) used to print raw products like `1.0999000000099999`. Every multiplier the game shows — fight title, ladder rows, announcer — goes through `fmtMul` in `engine.js`, which rounds to three decimals and prints the shortest clean string (`1.1`, `0.972`, `1.25`).
 
+## Every boss has a signature — SIGNATURE WAVE
+
+The owner's audit was right: too many lieutenants were rotations of the same eight attacks. Now **every one of the 42 bosses carries a named, test-pinned signature** — a gimmick only it owns, announced before every round (`SIGNATURE — <name>: <what it does>`) and listed on every hub roster card. Sharing attacks is still fine (they remain as filler); sharing an identity is not.
+
+Nine new mechanics were built for the wave: **seek** (homing drift — MOSSBACK's SPORE DRIFT, VESPER's CHOIR DRIFT, PALE LEVIATHAN's PALE CURRENT), **mines** that burst when crowded or on fuse (CINDERMITE's ASH VENTS, THE LEDGER's INK SEALS, LANTERN MAW's LURE LIGHTS), **orbit** halos that circle and burst outward (PALE HERALD's SERMON HALO, THE MINTER's COIN HALO, MAELSTROM's VORTEX RING), **walls** that cross the arena with one gap (GLOAMWARDEN's DROWN TIDE, THE LOOM's THREAD CURTAINS, THE LAST SHORE's THE LAST WAVE), **mortar** shells that burst on marked squares (CARRION LAW's SUBPOENA, DREDGEWARDEN's DREDGE SHELLS), a **pull** that drags your line (THE BALLAST's THE PULL, THE UNDERTOW's THE UNDERTOW), **marks** that bill the exact square you stood on (THE AUDITOR's THE AUDIT, PRESSURE SAINT's PILGRIM MARK, THE ABYSSAL ARCHIVE's DOCUMENTED), a **blink** teleport with an arrival clap (THE PUPPETEER's MARIONETTE, NULL SOVEREIGN's KING'S STEP), wall-**ricochet** slugs (THE GORGET's RICOCHET PLATE), and **blooming pools** that grow wider while they live (BILESPITTER's BILE BLOOM, CINDERMAW's FURNACE BLOOM).
+
+Fairness laws carried through and pinned: every new hurt-speed ≤ 90, pop bursts leave slower than a run, pull force ≤ 26 (under BULWARK's 56 run — always escapable), blink never lands on the runner and honors the dt=0 movement contract, floor-denial signatures never share a phase with spawn, and every boss is re-proven at its gate 3/3. The audit also caught THE GLUTTON's finale quietly pairing its brood spawn with floor pools — the exact herding pair the VESPER lesson forbids; the pattern was fixed, not the test.
+
 ## The charge tells the truth — HONEST DASH
 
 A charge telegraphs as a dashed red line, and the line is now **honest**: it shows the exact path the boss will dash — same length as the real dash, cut off cleanly at a wall — with a **stop marker** where the boss will land. The dash itself is real: ~120-150 px of ground eaten in under a second (angry phases faster), and the body hit still hurts. Read the line, step aside, punish the recovery.
@@ -78,7 +86,7 @@ THE SURGEON (280 → 500) and HIVE MOTHER (440 → 480) were rebuilt into the ch
 
 **Controls:** WASD/arrows move · SPACE/SHIFT dash (i-frames) · E ability · P/ESC pause. Your gun auto-fires at the nearest hostile; the game is positioning, dash timing, and pattern reading.
 
-**Fairness law:** every attack is telegraphed for at least 0.5 s (gold flash, dashed charge lines, outlined pools — even under the fury curve's tele compression), projectile and charge speeds are capped, floor pools can never appear on top of you, and phase transitions wipe live bullets before the burst ring spawns. All of this is asserted by tests.
+**Fairness law:** every attack is telegraphed for at least 0.5 s (gold flash, dashed charge lines, outlined pools, mine squares, mark reticles, curtain edges with the gap drawn, blink ghosts — even under the fury curve's tele compression), projectile and charge speeds are capped, floor hazards can never arm on top of you, and phase transitions wipe live bullets and marks before the burst ring spawns. All of this is asserted by tests.
 
 ## Run and test
 
@@ -93,20 +101,20 @@ The sim suite runs the engine headlessly in Node and gates every release three w
 2. **BULWARK (the siege frame) proves the beyond band at base, 3/3 seeds — all twenty-three of them.** Platinum+ presets are the documented beyond-bot zone — the suite survival-gates them instead of demanding full clears, with one endability exception: **GRAVEWAKE must stay clearable at the PLATINUM preset (3/3)** — the summon-stall regression pin (a boss the player survives but can never finish is a bug, not a wall).
 3. **The dashless casual reference** (same bot brain, dash disabled) must clear the bronze tutorial on at least half its seeds and never clear the DEATHWARRANT area — HIVE MOTHER is knowingly kite-able without dash (spiral gaps; logged as INFO, not a leak).
 
-Plus the **arena-ownership invariants** (seven exclusive FULL BENCH pools of ≥ 5, pairwise disjoint, union = the whole roster, pool weight escalating arena by arena), the **mutator pins** (deck integrity, deterministic draws, rank draw-shape rules, spawner-only BROOD BLIGHT, effect pins for all eight twists, BOUNTY economy, per-mutator tutorial gates), the **phase-fury behavior pins** (curve monotonicity, tele-floor survival, burst-ring speed below run speed, wipe-per-transition), the **charge-honesty pins** (roster-wide speed × dur ≥ 110, natural-transition full-dash travel, the dt=0 no-op contract), fairness probes from live sims, ranked-economy unit tests (SR deltas, promotions, unlocks, save migration, seasons, Top 5), and a random-input fuzz across all 42 bosses.
+Plus the **arena-ownership invariants** (seven exclusive FULL BENCH pools of ≥ 5, pairwise disjoint, union = the whole roster, pool weight escalating arena by arena), the **signature pins** (42 unique names, 17 distinct types, every boss's phases actually carry its signature, new-mechanic fairness floors, engine behavior probes for seek/orbit/wall/mortar/mines/mark/blink/pull/ricochet through natural transitions), the **mutator pins** (deck integrity, deterministic draws, rank draw-shape rules, spawner-only BROOD BLIGHT, effect pins for all eight twists, BOUNTY economy, per-mutator tutorial gates), the **phase-fury behavior pins** (curve monotonicity, tele-floor survival, burst-ring speed below run speed, wipe-per-transition), the **charge-honesty pins** (roster-wide speed × dur ≥ 110, natural-transition full-dash travel, the dt=0 no-op contract), fairness probes from live sims, ranked-economy unit tests (SR deltas, promotions, unlocks, save migration, seasons, Top 5), and a random-input fuzz across all 42 bosses.
 
 Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, not broken** — cleared arenas + stars convert to starting SR (100 per arena + 20 per star; a full 5-arena/15-star save lands at 800 SR, Gold 1).
 
 ## Architecture
 
-- `engine.js` — pure rules/sim engine (no DOM): player, dash i-frames, hitscan, projectiles, beams, zones, minions, boss pattern interpreter, the PHASE FURY aggression curve + transition burst ring, the ROUND VARIETY mutator deck + draw rules, ranked ladder (SR economy, rank pools + modifiers, seasons, Top 5, save migration). Runs in the browser and in Node.
-- `chars.js`, `bosses.js` — pure data: operatives; the 42-boss roster with `band` weight classes (bronze / silver / gold / beyond), built from pattern primitives (aimed / ring / shotgun / sweep / charge / zone / spiral / spawn).
+- `engine.js` — pure rules/sim engine (no DOM): player, dash i-frames, hitscan, projectiles, beams, zones, minions, floor marks, boss pattern interpreter (including the SIGNATURE WAVE mechanics: seek / mines / orbit / wall / mortar / pull / mark / blink / ricochet / growing pools), the PHASE FURY aggression curve + transition burst ring, the ROUND VARIETY mutator deck + draw rules, ranked ladder (SR economy, rank pools + modifiers, seasons, Top 5, save migration). Runs in the browser and in Node.
+- `chars.js`, `bosses.js` — pure data: operatives; the 42-boss roster with `band` weight classes (bronze / silver / gold / beyond) and a named `sig` signature per boss, built from pattern primitives (aimed / ring / shotgun / sweep / charge / zone / spiral / spawn / seek / mines / orbit / wall / mortar / pull / mark / blink / ric).
 - `palette.js` — 16-color retro palette. `audio.js` — WebAudio bleep synth, no assets.
 - `app.js` — fixed-timestep loop, pixel renderer, ranked hub (rank card, ladder, Top 5, arena-pool roster), results, localStorage save.
 - `tests/sim-test.js` — everything above. `scripts/run-tests.js` — the runner.
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.17 // FULL BENCH** (bust `20261110m`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.18 // SIGNATURE WAVE** (bust `20261110n`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

@@ -51,6 +51,7 @@ function immediateDanger(st) {
     if (dd < 12) danger += 30;
   }
   for (const z of st.zones) if (st.t < z.until && Math.hypot(z.x - p.x, z.y - p.y) < z.r) danger += 40;
+  for (const mk of st.marks) if (Math.hypot(mk.x - p.x, mk.y - p.y) < mk.r + 4) danger += 30; // mines burst when crowded
   for (const m of st.minions) { const md = Math.hypot(m.x - p.x, m.y - p.y); if (md < 16) danger += (16 - md) * 2.5; }
   if (Math.hypot(st.boss.x - p.x, st.boss.y - p.y) < st.boss.r + 8) danger += 30;
   return danger;
@@ -73,9 +74,27 @@ function botInput(st) {
         else if (d < 26) danger += 1;
       }
       for (const z of st.zones) if (st.t < z.until && Math.hypot(z.x - px, z.y - py) < z.r + 5) danger += 45;
+      for (const mk of st.marks) if (Math.hypot(mk.x - px, mk.y - py) < mk.r + 6) danger += 45;
+      for (const q of st.proj) if (q.tx !== undefined && Math.hypot(q.tx - px, q.ty - py) < 26) danger += 18; // shells pop there
       const rt = st.boss.rt;
       if (rt.mode === 'tele' && rt.pat) {
         if (rt.pat.type === 'zone') for (const s of rt.data.spots) if (Math.hypot(s.x - px, s.y - py) < rt.pat.r + 4) danger += 45;
+        // SIGNATURE floor telegraphs: mines / mortar targets / pinned marks pre-plan
+        // their spots at telegraph start — read them exactly like pool outlines
+        if (rt.pat.type === 'mines' || rt.pat.type === 'mortar' || rt.pat.type === 'mark') {
+          for (const s of rt.data.spots) if (Math.hypot(s.x - px, s.y - py) < rt.pat.r + 6) danger += 45;
+        }
+        if (rt.pat.type === 'blink' && rt.data.dest) {
+          // the ghost shows where the body lands — do not stand on the landing square
+          const dd = Math.hypot(rt.data.dest.x - px, rt.data.dest.y - py);
+          if (dd < st.boss.r + 16) danger += (st.boss.r + 16 - dd) * 4;
+        }
+        if (rt.pat.type === 'wall') {
+          // a curtain with one gap: drift toward the gap band while it reads
+          const along = rt.data.edge < 2 ? px : py;
+          const dg = Math.abs(along - rt.data.gap) - rt.pat.gapW / 2;
+          if (dg > 0) danger += Math.min(16, dg * 0.5);
+        }
         if (rt.pat.type === 'aimed' || rt.pat.type === 'shotgun') {
           // read the cone: the volley is locked at telegraph start — don't stand in it
           const aim = rt.data.aim, half = ((rt.pat.spread * Math.PI) / 180) / 2;
@@ -96,6 +115,12 @@ function botInput(st) {
           const dd = pointLineDist(px, py, st.boss.x, st.boss.y, ex, ey);
           if (dd < 14) danger += (14 - dd) * 6;
         }
+      }
+      if (st.wallSig && st.t < st.wallSig.until) {
+        // the curtain still marches after its pattern ended — keep seeking the gap
+        const along = st.wallSig.edge < 2 ? px : py;
+        const dg = Math.abs(along - st.wallSig.gap) - st.wallSig.gw / 2;
+        if (dg > 0) danger += Math.min(20, dg * 0.6);
       }
       if (st.beams.length && rt.pat && rt.pat.type === 'sweep') {
         for (const beam of st.beams) {
@@ -225,7 +250,7 @@ check('SILVER stays in the DEATHWARRANT area (HP x1.05, no pacing squeeze)',
   PIT.rankMods(PIT.RANKS.find(r => r.name === 'SILVER')).hpMult <= 1.1 &&
   PIT.rankMods(PIT.RANKS.find(r => r.name === 'SILVER')).gapMult >= 0.95);
 
-let teleOK = true, speedOK = true, chargeOK = true, minTele = Infinity, enrageOK = true;
+let teleOK = true, speedOK = true, chargeOK = true, minTele = Infinity, enrageOK = true, sigSpeedOK = true;
 for (const b of BOSSES.LIST) {
   b.phases.forEach((ph, pi) => {
     if (ph.enrage && pi !== b.phases.length - 1) enrageOK = false; // enrage is a last-stand convention
@@ -234,6 +259,15 @@ for (const b of BOSSES.LIST) {
       if (pat.tele < 0.5) teleOK = false;
       if ((pat.type === 'aimed' || pat.type === 'ring' || pat.type === 'shotgun' || pat.type === 'spiral') && pat.speed > 90) speedOK = false;
       if (pat.type === 'charge' && pat.speed > 190) chargeOK = false;
+      // SIGNATURE WAVE: every HURTING speed the new mechanics carry is capped at 90 —
+      // shells never hurt (the burst does), orbit releases are multiplier-free pins
+      const sigSpeed = pat.type === 'seek' ? pat.speed
+        : pat.type === 'wall' ? pat.speed
+        : (pat.type === 'mines' || pat.type === 'mark' || pat.type === 'mortar') ? pat.popSpeed
+        : pat.type === 'orbit' ? pat.speed
+        : pat.type === 'blink' ? pat.clapSpeed
+        : pat.type === 'ric' ? pat.speed : null;
+      if (sigSpeed != null && sigSpeed > 90) sigSpeedOK = false;
     }
   });
   for (let i = 1; i < b.phases.length; i++) if (b.phases[i].until >= b.phases[i - 1].until) enrageOK = false;
@@ -241,6 +275,7 @@ for (const b of BOSSES.LIST) {
 check(`every pattern telegraphs >= 0.5s (min ${minTele}s)`, teleOK);
 check('projectile speeds capped at 90', speedOK);
 check('charge speeds capped at 190', chargeOK);
+check('signature hurt-speeds capped at 90 (seek/wall/mines/mark/mortar/orbit/blink/ric)', sigSpeedOK);
 check('phase thresholds descend; enrage only on the final phase', enrageOK);
 // PHASE FURY data-side pins: the fairness floor must survive the engine's tele
 // compression at the deepest curve step, and the escalation data is monotonic.
@@ -844,8 +879,8 @@ console.log('--- Charge honesty ---');
   BOSSES.LIST.forEach((b, i) => b.phases.forEach(ph => ph.patterns.forEach(p => {
     if (p.type === 'charge') charges.push({ b, p });
   })));
-  check(`every charge in the roster carries a real dash (22 patterns, speed x dur >= 110; found ${charges.length})`,
-    charges.length === 22 && charges.every(c => c.p.speed * c.p.dur >= 110));
+  check(`every charge in the roster carries a real dash (23 patterns, speed x dur >= 110; found ${charges.length})`,
+    charges.length === 23 && charges.every(c => c.p.speed * c.p.dur >= 110));
   check('charge speed stays under the fairness cap (190)', charges.every(c => c.p.speed <= 190));
   {
     // natural-transition travel: put the boss mid-arena, let the ENGINE do the
@@ -904,6 +939,187 @@ console.log('--- Full bench: the 2026.11.17 additions ---');
       p.type !== 'charge' || (p.speed * p.dur >= 110 && p.speed <= 190)))));
 }
 
+// ================= SIGNATURE WAVE (owner spec: "every boss should feel a little unique") =================
+console.log('--- Boss signatures: nobody shares an identity ---');
+{
+  // ---------- data pins ----------
+  check('every boss carries a named signature (name + blurb + type)',
+    BOSSES.LIST.every(b => b.sig && b.sig.name && b.sig.blurb && b.sig.type));
+  check('all 42 signature names are unique', new Set(BOSSES.LIST.map(b => b.sig.name)).size === 42);
+  const types = new Set(BOSSES.LIST.map(b => b.sig.type));
+  check(`the roster uses 17 distinct signature types (found ${types.size})`, types.size === 17);
+  check('every brand-new mechanic owns signatures on the roster',
+    ['seek', 'mines', 'orbit', 'wall', 'mortar', 'pull', 'mark', 'blink', 'ric'].every(t => types.has(t)));
+  check("each boss's phases actually carry its signature (arsenal = >= 5 distinct types)",
+    BOSSES.LIST.every(b => b.sig.type === 'arsenal'
+      ? new Set(b.phases.flatMap(ph => ph.patterns.map(p => p.type))).size >= 5
+      : b.phases.some(ph => ph.patterns.some(p => p.type === b.sig.type))));
+  check('blooming pools are the BILESPITTER/CINDERMAW signature alone',
+    BOSSES.LIST.every(b => b.phases.every(ph => ph.patterns.every(p =>
+      p.type !== 'zone' || !p.grow || b.id === 'bilespitter' || b.id === 'cindermaw'))));
+  check('pull force stays escapable (<= 26, under BULWARK run 56)',
+    BOSSES.LIST.every(b => b.phases.every(ph => ph.patterns.every(p => p.type !== 'pull' || p.force <= 26))));
+  check('pop bursts leave slower than a run (<= 46 < 68)',
+    BOSSES.LIST.every(b => b.phases.every(ph => ph.patterns.every(p =>
+      !['mines', 'mark', 'mortar'].includes(p.type) || p.popSpeed <= 46))));
+  check('blink arrival claps are walkable and never land on the runner (clap < 68, dist >= 40)',
+    BOSSES.LIST.every(b => b.phases.every(ph => ph.patterns.every(p =>
+      p.type !== 'blink' || (p.clapSpeed < 68 && p.dist >= 40)))));
+  check('floor-denial signatures never share a phase with spawn (the herding law, VESPER lesson)',
+    BOSSES.LIST.every(b => b.phases.every(ph => {
+      if (!ph.patterns.some(p => p.type === 'spawn')) return true;
+      return !ph.patterns.some(p => ['mines', 'mark', 'mortar', 'zone'].includes(p.type));
+    })));
+
+  // ---------- engine behavior pins (NATURAL transitions — the AGENTS probe law) ----------
+  // drive a boss's real pattern through the engine's own gap->tele->active handoff
+  function driveTo(bossId, patType, phaseIdx = 0) {
+    const st = PIT.createRun({ boss: bossId, charId: 'volt', seed: 55 });
+    st.boss.phase = phaseIdx;
+    const ph = st.bossDef.phases[phaseIdx];
+    const pi = ph.patterns.findIndex(p => p.type === patType);
+    if (pi < 0) throw new Error(bossId + ' has no ' + patType + ' in phase ' + phaseIdx);
+    st.boss.rt = { mode: 'gap', timer: 0.001, pat: null, patIdx: (pi - 1 + ph.patterns.length) % ph.patterns.length };
+    let steps = 0;
+    while (st.boss.rt.mode !== 'active' && steps++ < 600) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    return st;
+  }
+  // SPORE DRIFT: seek bullets steer toward the runner at the capped turn rate
+  {
+    const st = PIT.createRun({ boss: 'mossback', charId: 'volt', seed: 55 });
+    const pat = st.bossDef.phases[0].patterns.find(p => p.type === 'seek');
+    st.player.x = st.boss.x - 60; st.player.y = st.boss.y - 40;
+    st.boss.rt = { mode: 'tele', timer: 0.001, pat, patIdx: 0, data: { aim: 0 }, spawned: 0, sub: 0 };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const q = st.proj[0];
+    const a0 = Math.atan2(q.vy, q.vx);
+    const want = Math.atan2(st.player.y - q.y, st.player.x - q.x);
+    for (let i = 0; i < 30; i++) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const a1 = Math.atan2(q.vy, q.vx);
+    const d0 = Math.abs(Math.atan2(Math.sin(want - a0), Math.cos(want - a0)));
+    const d1 = Math.abs(Math.atan2(Math.sin(want - a1), Math.cos(want - a1)));
+    check('SPORE DRIFT: seek bullets home toward the runner (angle closes ' + d0.toFixed(2) + ' -> ' + d1.toFixed(2) + ')',
+      st.proj.some(x => x.kind === 'seek') && d1 < d0 && Math.abs(d1 - d0) <= 0.9 * 0.5 + 0.01);
+  }
+  // SERMON HALO: orbiters ride the boss, then release radially at the pinned speed
+  {
+    const st = driveTo('paleherald', 'orbit');
+    const orbs = st.proj.filter(q => q.kind === 'orb' && q.orbR);
+    check('SERMON HALO: 8 lights ride the halo at radius 30 during the hold',
+      orbs.length === 8 && orbs.every(q => Math.abs(Math.hypot(q.x - st.boss.x, q.y - st.boss.y) - 30) < 1));
+    for (let i = 0; i < Math.ceil(2.5 * 60); i++) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const rel = st.proj.filter(q => q.kind === 'orb');
+    check('SERMON HALO: at the amen every light releases radially at exactly 46 px/s (no multipliers)',
+      rel.length === 8 && rel.every(q => q.orbR === 0 && Math.abs(Math.hypot(q.vx, q.vy) - 46) < 0.01));
+  }
+  // DROWN TIDE: the wall spawns with its gap, and the geometry stays live while it marches
+  {
+    const st = driveTo('gloamwarden', 'wall');
+    const gap = st.boss.rt.data.gap, gw = st.boss.rt.pat.gapW, edge = st.boss.rt.data.edge;
+    const walls = st.proj.filter(q => q.kind === 'wall');
+    const inGap = walls.filter(q => {
+      const along = edge < 2 ? q.x : q.y;
+      return Math.abs(along - gap) < gw / 2 - 2;
+    });
+    check(`DROWN TIDE: the curtain spawns (${walls.length} slugs) with its gap kept open`, walls.length >= 16 && inGap.length === 0);
+    check('the wall geometry stays published while the curtain marches (st.wallSig)',
+      st.wallSig && st.wallSig.edge === edge && st.wallSig.gap === gap && st.wallSig.until > st.t);
+  }
+  // SUBPOENA: shells fly to their marked squares and burst there
+  {
+    const st = driveTo('carrionlaw', 'mortar', 1);
+    check('SUBPOENA: shells fly (never hurt) toward the pre-planned squares',
+      st.proj.some(q => q.kind === 'shell' && q.tx != null));
+    let popped = false, atSpot = false;
+    for (let i = 0; i < 240 && !popped; i++) {
+      PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+      popped = st.events.some(e => e.type === 'pop');
+    }
+    const pops = st.proj.filter(q => q.kind === 'pop');
+    const spots = st.boss.rt.data.spots;
+    atSpot = pops.length > 0 && spots.some(s => Math.hypot(pops[0].x - s.x, pops[0].y - s.y) < 8);
+    check('SUBPOENA: the shell bursts into a verdict ring ON its marked square', popped && atSpot);
+  }
+  // ASH VENTS: mines burst when crowded or when the fuse runs out
+  {
+    const st = driveTo('cindermite', 'mines');
+    check('ASH VENTS: 2 cinder mines arm on the floor', st.marks.length === 2 && st.marks.every(m => m.mine));
+    const mk = st.marks[0];
+    st.player.x = clamp(mk.x + mk.r + 2, AR.x0 + 4, AR.x1 - 4); st.player.y = mk.y; // crowd it
+    st.player.invuln = 0; st.player.dashI = 0;
+    let popped = false;
+    for (let i = 0; i < 10 && !popped; i++) { PIT.step(st, 1 / 60, { mx: 0, my: 0 }); popped = st.marks.length < 2; }
+    check('ASH VENTS: crowding a mine bursts it early (pop ring out, mine gone)',
+      popped && st.proj.some(q => q.kind === 'pop'));
+  }
+  {
+    const st = driveTo('cindermite', 'mines');
+    for (let i = 0; i < Math.ceil(3.4 * 60); i++) PIT.step(st, 1 / 60, { mx: 60, my: 0 }); // stay away
+    check('ASH VENTS: an uncrowded mine still bursts when its fuse ends', st.marks.length === 0);
+  }
+  // THE AUDIT: the mark pins the square you stood on, then bills it
+  {
+    const st = PIT.createRun({ boss: 'theauditor', charId: 'volt', seed: 55 });
+    const ph = st.bossDef.phases[0];
+    const pi = ph.patterns.findIndex(p => p.type === 'mark');
+    st.boss.rt = { mode: 'gap', timer: 0.001, pat: null, patIdx: (pi - 1 + ph.patterns.length) % ph.patterns.length };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 }); // pickPattern: the mark locks NOW
+    const locked = { ...st.boss.rt.data.spots[0] };
+    check('THE AUDIT: the reticle locks the exact square you stand on at telegraph start',
+      Math.abs(locked.x - st.player.x) < 0.01 && Math.abs(locked.y - st.player.y) < 0.01);
+    let steps = 0;
+    while (st.boss.rt.mode !== 'active' && steps++ < 600) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    check('THE AUDIT: the mark arms (no proximity trigger — it bills on the fuse)',
+      st.marks.length === 1 && st.marks[0].mine === false);
+    st.player.x = clamp(locked.x + 90, AR.x0 + 4, AR.x1 - 4); // run away — the mark stays
+    for (let i = 0; i < Math.ceil(1.0 * 60); i++) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    check('THE AUDIT: the burst lands on the audited square after the fuse, runner gone',
+      st.marks.length === 0 && st.proj.some(q => q.kind === 'pop' && Math.hypot(q.x - locked.x, q.y - locked.y) < 10));
+  }
+  // MARIONETTE: dt=0 no-op on the transition, lands exactly on the ghost, clap ring
+  {
+    const st = PIT.createRun({ boss: 'puppeteer', charId: 'volt', seed: 55 });
+    const ph = st.bossDef.phases[0];
+    const pi = ph.patterns.findIndex(p => p.type === 'blink');
+    const bossHome = { x: st.boss.x, y: st.boss.y };
+    st.boss.rt = { mode: 'gap', timer: 0.001, pat: null, patIdx: (pi - 1 + ph.patterns.length) % ph.patterns.length };
+    let steps = 0;
+    while (st.boss.rt.mode !== 'active' && steps++ < 600) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    check('MARIONETTE: the dt=0 transition call does not teleport (the movement law)',
+      st.boss.rt.mode === 'active' && st.boss.x === bossHome.x && st.boss.y === bossHome.y);
+    check('MARIONETTE: the ghost square is honest (>= 30px from the runner, in-arena)',
+      st.boss.rt.data.dest && Math.hypot(st.boss.rt.data.dest.x - st.player.x, st.boss.rt.data.dest.y - st.player.y) >= 29 &&
+      st.boss.rt.data.dest.x > AR.x0 && st.boss.rt.data.dest.x < AR.x1);
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 }); // first real frame: the jump happens
+    check("KING'S STEP contract: the body lands exactly where shown, with its arrival clap",
+      st.boss.x === st.boss.rt.data.dest.x && st.boss.y === st.boss.rt.data.dest.y &&
+      st.proj.filter(q => q.kind === 'clap').length === st.boss.rt.pat.clap &&
+      st.events.some(e => e.type === 'blink'));
+  }
+  // THE PULL: the vortex drags the runner toward the boss — escapable by walking
+  {
+    const st = driveTo('ballast', 'pull');
+    st.player.x = (AR.x0 + AR.x1) / 2; st.player.y = 140; st.player.invuln = 0; st.player.dashI = 0;
+    const d0 = Math.hypot(st.boss.x - st.player.x, st.boss.y - st.player.y);
+    for (let i = 0; i < 30; i++) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const d1 = Math.hypot(st.boss.x - st.player.x, st.boss.y - st.player.y);
+    check(`THE PULL: standing still drags you ${Math.round(d0 - d1)}px closer in 0.5s (force 24, escapable)`,
+      d1 < d0 - 5 && d0 - d1 < 20);
+  }
+  // RICOCHET PLATE: court slugs bound off the walls, twice
+  {
+    const st = PIT.createRun({ boss: 'gorget', charId: 'volt', seed: 55 });
+    const pat = st.bossDef.phases[0].patterns.find(p => p.type === 'ric');
+    st.boss.x = 280; st.boss.y = 100;
+    st.boss.rt = { mode: 'tele', timer: 0.001, pat, patIdx: 0, data: { aim: 0 }, spawned: 0, sub: 0 };
+    PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    for (let i = 0; i < 50; i++) PIT.step(st, 1 / 60, { mx: 0, my: 0 });
+    const bounced = st.proj.filter(q => q.kind === 'ric' && q.bounces < pat.bounces);
+    check('RICOCHET PLATE: slugs bounce off the far wall (reflected, bounces decremented)',
+      bounced.length > 0 && bounced.every(q => q.vx < 0));
+  }
+}
+
 // ================= house guards =================
 console.log('--- House guards ---');
 {
@@ -912,8 +1128,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.17', APP.includes("const BUILD = '2026.11.17'"));
-  check('app.js update log leads with FULL BENCH', APP.includes("tag: 'FULL BENCH'") && APP.indexOf("tag: 'FULL BENCH'") < APP.indexOf("tag: 'HONEST DASH'"));
+  check('app.js pins BUILD 2026.11.18', APP.includes("const BUILD = '2026.11.18'"));
+  check('app.js update log leads with SIGNATURE WAVE', APP.includes("tag: 'SIGNATURE WAVE'") && APP.indexOf("tag: 'SIGNATURE WAVE'") < APP.indexOf("tag: 'FULL BENCH'"));
+  check('app.js update log keeps the FULL BENCH entry', APP.includes("tag: 'FULL BENCH'") && APP.indexOf("tag: 'FULL BENCH'") < APP.indexOf("tag: 'HONEST DASH'"));
   check('app.js logs the ROUND ANNOUNCER entry', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
   check('app.js logs the ROUND VARIETY entry', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
   check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
@@ -927,9 +1144,14 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.17 // FULL BENCH', IDX.includes('BUILD 2026.11.17 // CORE BREACH: PIT — FULL BENCH'));
+  check('index.html footer stamps BUILD 2026.11.18 // SIGNATURE WAVE', IDX.includes('BUILD 2026.11.18 // CORE BREACH: PIT — SIGNATURE WAVE'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110m', busts.length === 7 && busts.every(t => t === '?v=20261110m'), busts.join(','));
+  check('all 7 asset tags bust at 20261110n', busts.length === 7 && busts.every(t => t === '?v=20261110n'), busts.join(','));
+  check('SIGNATURE WAVE UI: the announcer names the signature and the roster lists it',
+    APP.includes("$('#ready-sig')") && APP.includes('SIGNATURE — ') && APP.includes('class="rb-sig"'));
+  check('SIGNATURE WAVE markup + styles: ready-sig element, .rsig card, roster sig tag, howto',
+    IDX.includes('id="ready-sig"') && CSS.includes('.rsig') && CSS.includes('.rsig-blurb') &&
+    CSS.includes('.rb-sig') && IDX.includes('Every boss has a signature'));
   {
     // BROOD TAX data pin: the summon cadence law for the reported boss — the brood phase
     // keeps spawn at most 1-of-3 patterns with the swarm capped at 4.

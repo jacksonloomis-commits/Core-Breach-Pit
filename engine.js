@@ -103,7 +103,8 @@
         srMult: muts.reduce((a, m) => a * (m.srMult || 1), 1)
       },
       mutators: muts.map(m => ({ id: m.id, name: m.name, blurb: m.blurb })),
-      proj: [], zones: [], beams: [], minions: [], tracers: [],
+      proj: [], zones: [], beams: [], minions: [], tracers: [], marks: [],
+      wallSig: null, // live wall-curtain geometry (edge/gap) while its bullets march
       shield: 0,
       hitsTaken: 0,
       events: [],
@@ -165,6 +166,66 @@
         rt.data.spots.push({ x, y });
       }
     }
+    // SIGNATURE WAVE data prep — every floor-denial and teleport signature pre-plans
+    // its geometry at telegraph START so the renderer can outline the truth before it
+    // goes live (same contract the zone pools already honor).
+    if (pat.type === 'mark') {
+      // the mark pins the square you STAND on (the gimmick: the audit follows you) —
+      // fairness lives in the warning length: tele + fuse before the burst
+      rt.data.spots = [{ x: p.x, y: p.y }];
+      for (let i = 1; i < pat.count; i++) {
+        const a = st.rng() * TAU;
+        rt.data.spots.push({
+          x: clamp(p.x + Math.cos(a) * 46, AR.x0 + pat.r, AR.x1 - pat.r),
+          y: clamp(p.y + Math.sin(a) * 46, AR.y0 + pat.r, AR.y1 - pat.r)
+        });
+      }
+    }
+    if (pat.type === 'mines' || pat.type === 'mortar') {
+      // mines and mortar targets shunt away from the runner exactly like zone pools —
+      // and the guarantee must SURVIVE the wall clamp: a spot clamped back inside its
+      // own burst radius would arm and pop in the same frame (gate-found wart)
+      rt.data.spots = [];
+      for (let i = 0; i < pat.count; i++) {
+        let x = clamp(p.x + (st.rng() - 0.5) * 150, AR.x0 + pat.r, AR.x1 - pat.r);
+        let y = clamp(p.y + (st.rng() - 0.5) * 110, AR.y0 + pat.r, AR.y1 - pat.r);
+        if (dist(x, y, p.x, p.y) < 26) {
+          const ang = Math.atan2(y - p.y, x - p.x) || 0;
+          x = clamp(p.x + Math.cos(ang) * 34, AR.x0 + pat.r, AR.x1 - pat.r);
+          y = clamp(p.y + Math.sin(ang) * 34, AR.y0 + pat.r, AR.y1 - pat.r);
+          if (dist(x, y, p.x, p.y) < pat.r + 10) {
+            // clamped back into burst range: mirror the push through the runner, then
+            // fall back to the arena center (the one square always far from the walls)
+            x = clamp(p.x - Math.cos(ang) * 34, AR.x0 + pat.r, AR.x1 - pat.r);
+            y = clamp(p.y - Math.sin(ang) * 34, AR.y0 + pat.r, AR.y1 - pat.r);
+            if (dist(x, y, p.x, p.y) < pat.r + 10) {
+              x = (AR.x0 + AR.x1) / 2; y = (AR.y0 + AR.y1) / 2;
+            }
+          }
+        }
+        rt.data.spots.push({ x, y });
+      }
+    }
+    if (pat.type === 'wall') {
+      // a curtain crosses from one edge with ONE gap — the edge and the gap are chosen
+      // at telegraph start so the renderer can draw the honest row
+      const edge = Math.floor(st.rng() * 4); // 0 top 1 bottom 2 left 3 right
+      const along = edge < 2 ? AR.x1 - AR.x0 : AR.y1 - AR.y0;
+      rt.data.edge = edge;
+      rt.data.gap = pat.gapW + st.rng() * Math.max(1, along - pat.gapW * 2);
+    }
+    if (pat.type === 'blink') {
+      // destination locks at telegraph start and is drawn as a ghost — the dodge is
+      // leaving the landing square. If the clamp would land it on the runner, reflect.
+      const a = st.rng() * TAU;
+      let dx = p.x + Math.cos(a) * pat.dist, dy = p.y + Math.sin(a) * pat.dist;
+      dx = clamp(dx, AR.x0 + b.r, AR.x1 - b.r); dy = clamp(dy, AR.y0 + b.r, AR.y1 - b.r);
+      if (dist(dx, dy, p.x, p.y) < 30) {
+        dx = clamp(p.x - Math.cos(a) * pat.dist, AR.x0 + b.r, AR.x1 - b.r);
+        dy = clamp(p.y - Math.sin(a) * pat.dist, AR.y0 + b.r, AR.y1 - b.r);
+      }
+      rt.data.dest = { x: dx, y: dy };
+    }
     st.events.push({ type: 'tele', pat: pat.type, x: b.x, y: b.y });
   }
 
@@ -193,6 +254,17 @@
     const mult = aggroAt(st.boss.phase + (st.mods.aggroShift || 0)).speed *
       (phase.enrage ? 1.15 : 1) * (st.mods.projMult || 1);
     st.proj.push({ x, y, vx: Math.cos(ang) * speed * mult, vy: Math.sin(ang) * speed * mult, r: 3, kind: kind || 'shot' });
+  }
+
+  // mortar shells never hurt — the burst where they LAND is the hazard. 132 px/s
+  // flight keeps the arc readable without making the pop a surprise.
+  const SHELL_SPEED = 132;
+
+  function popRing(st, x, y, count, speed, kind) {
+    const off = st.rng() * TAU;
+    for (let i = 0; i < count; i++) {
+      spawnProj(st, x, y, off + (TAU * i) / count, speed, kind || 'pop');
+    }
   }
 
   function execPattern(st, dt) {
@@ -250,7 +322,9 @@
         break;
       }
       case 'zone': {
-        for (const s of rt.data.spots) st.zones.push({ x: s.x, y: s.y, r: pat.r, until: st.t + pat.pool, hitCd: 0 });
+        for (const s of rt.data.spots) {
+          st.zones.push({ x: s.x, y: s.y, r: pat.r, r0: pat.r, grow: pat.grow || 0, born: st.t, until: st.t + pat.pool, hitCd: 0 });
+        }
         st.events.push({ type: 'pool' });
         break;
       }
@@ -280,6 +354,86 @@
           });
         }
         st.events.push({ type: 'spawn' });
+        break;
+      }
+      // ---------- SIGNATURE WAVE mechanics ----------
+      // Fairness contract shared by all of them: the telegraph tells the truth (spots,
+      // edges, ghost squares drawn from rt.data), every hurting speed <= 90, pull force
+      // under the slowest operative's run speed, and MOVEMENT patterns (blink) honor
+      // the dt=0 no-op law the HONEST DASH regression pinned for charge.
+      case 'seek': {
+        // slow homing slugs: fan out from the locked aim, then steer after the runner
+        const mid = rt.data.aim, spread = ((pat.spread || 24) * Math.PI) / 180;
+        for (let i = 0; i < pat.count; i++) {
+          const a = mid - spread / 2 + (pat.count === 1 ? spread / 2 : (spread * i) / (pat.count - 1));
+          spawnProj(st, b.x, b.y, a, pat.speed, 'seek');
+          st.proj[st.proj.length - 1].seek = pat.turn;
+        }
+        st.events.push({ type: 'fire', x: b.x, y: b.y });
+        break;
+      }
+      case 'mines': {
+        for (const s of rt.data.spots) {
+          st.marks.push({ x: s.x, y: s.y, r: pat.r, fuse: pat.fuse, pop: pat.pop, popSpeed: pat.popSpeed, mine: true });
+        }
+        st.events.push({ type: 'pool' });
+        break;
+      }
+      case 'mark': {
+        for (const s of rt.data.spots) {
+          st.marks.push({ x: s.x, y: s.y, r: pat.r, fuse: pat.fuse, pop: pat.pop, popSpeed: pat.popSpeed, mine: false });
+        }
+        st.events.push({ type: 'pool' });
+        break;
+      }
+      case 'mortar': {
+        for (const s of rt.data.spots) {
+          const fly = Math.max(0.25, dist(b.x, b.y, s.x, s.y) / SHELL_SPEED);
+          st.proj.push({
+            x: b.x, y: b.y, r: 2, kind: 'shell',
+            vx: (s.x - b.x) / fly, vy: (s.y - b.y) / fly,
+            tx: s.x, ty: s.y, shellT: fly, pop: pat.pop, popSpeed: pat.popSpeed
+          });
+        }
+        st.events.push({ type: 'fire', x: b.x, y: b.y });
+        break;
+      }
+      case 'wall': {
+        // a curtain of slugs marches in from one edge with ONE gap (rt.data.gap)
+        const gw = pat.gapW / 2;
+        if (rt.data.edge === 0) { for (let x = AR.x0 + 4; x <= AR.x1 - 4; x += 8) if (Math.abs(x - rt.data.gap) >= gw) spawnProj(st, x, AR.y0 + 3, Math.PI / 2, pat.speed, 'wall'); }
+        else if (rt.data.edge === 1) { for (let x = AR.x0 + 4; x <= AR.x1 - 4; x += 8) if (Math.abs(x - rt.data.gap) >= gw) spawnProj(st, x, AR.y1 - 3, -Math.PI / 2, pat.speed, 'wall'); }
+        else if (rt.data.edge === 2) { for (let y = AR.y0 + 4; y <= AR.y1 - 4; y += 8) if (Math.abs(y - rt.data.gap) >= gw) spawnProj(st, AR.x0 + 3, y, 0, pat.speed, 'wall'); }
+        else { for (let y = AR.y0 + 4; y <= AR.y1 - 4; y += 8) if (Math.abs(y - rt.data.gap) >= gw) spawnProj(st, AR.x1 - 3, y, Math.PI, pat.speed, 'wall'); }
+        // the curtain marches for seconds after the pattern ends — publish its geometry
+        // so the renderer and dodge-brains can still find the gap while it crosses
+        st.wallSig = { edge: rt.data.edge, gap: rt.data.gap, gw: pat.gapW, until: st.t + 3.5 };
+        st.events.push({ type: 'fire', x: b.x, y: b.y });
+        break;
+      }
+      case 'orbit': {
+        // halo bullets circle the boss for pat.hold seconds, then release radially
+        // (release speed carries NO multipliers — same walkable-pinned contract as the
+        // phase burst ring)
+        const off = st.rng() * TAU;
+        for (let i = 0; i < pat.count; i++) {
+          const a = off + (TAU * i) / pat.count;
+          spawnProj(st, b.x + Math.cos(a) * pat.radius, b.y + Math.sin(a) * pat.radius, a, 0.001, 'orb');
+          const q = st.proj[st.proj.length - 1];
+          q.orbAng = a; q.orbR = pat.radius; q.hold = pat.hold; q.relSpeed = pat.speed;
+        }
+        st.events.push({ type: 'fire', x: b.x, y: b.y });
+        break;
+      }
+      case 'ric': {
+        // court slugs bound off the arena walls pat.bounces times before dying
+        const mid = rt.data.aim, spread = (pat.spread * Math.PI) / 180;
+        for (let i = 0; i < pat.shots; i++) {
+          const a = mid - spread / 2 + (pat.shots === 1 ? spread / 2 : (spread * i) / (pat.shots - 1));
+          spawnProj(st, b.x, b.y, a, pat.speed, 'ric');
+          st.proj[st.proj.length - 1].bounces = pat.bounces;
+        }
+        st.events.push({ type: 'fire', x: b.x, y: b.y });
         break;
       }
       default: break;
@@ -362,7 +516,8 @@
     }
     if (b.hp <= 0 && !st.over) {
       st.over = 'win';
-      st.proj.length = 0; st.zones.length = 0; st.beams.length = 0; st.minions.length = 0;
+      st.proj.length = 0; st.zones.length = 0; st.beams.length = 0; st.minions.length = 0; st.marks.length = 0;
+      st.wallSig = null;
       st.events.push({ type: 'win' });
       return;
     }
@@ -372,7 +527,7 @@
     let ph = def.phases[b.phase];
     while (b.phase < def.phases.length - 1 && b.hp / b.maxHp <= def.phases[b.phase + 1].until) {
       b.phase++;
-      st.proj.length = 0; st.zones.length = 0; st.beams.length = 0; // fairness wipe
+      st.proj.length = 0; st.zones.length = 0; st.beams.length = 0; st.marks.length = 0; st.wallSig = null; // fairness wipe
       b.rt = { mode: 'gap', timer: 1.1 * st.mods.gapMult, pat: null, patIdx: -1 };
       // PHASE FURY: the transition answers you — a gold retaliation ring rides out of
       // the fairness wipe. Screen is clean, ring is visible from birth, and its speed
@@ -406,6 +561,18 @@
         addBeams(st, pat, rt.data.ang);
       }
       if (pat.type === 'charge') execPattern(st, dt); // charge moves boss during active
+      if (pat.type === 'blink' && dt > 0 && !rt.data.done) {
+        // MARIONETTE/KING'S STEP: the boss is simply elsewhere. The dt=0 transition
+        // call must NOT move it (same movement law the HONEST DASH regression pinned
+        // for charge) — the jump happens on the first real frame of the active window.
+        rt.data.done = true;
+        b.x = rt.data.dest.x; b.y = rt.data.dest.y;
+        const off = st.rng() * TAU;
+        for (let i = 0; i < pat.clap; i++) {
+          spawnProj(st, b.x, b.y, off + (TAU * i) / pat.clap, pat.clapSpeed, 'clap');
+        }
+        st.events.push({ type: 'blink', x: b.x, y: b.y });
+      }
       if (rt.timer <= 0) {
         rt.mode = 'recover';
         rt.timer = (typeof ph.recover === 'number' ? ph.recover : 0.25) * aggroAt(b.phase + (st.mods.aggroShift || 0)).gap;
@@ -416,10 +583,68 @@
       rt.timer = ph.gap * st.mods.gapMult * (ph.enrage ? 0.78 : 1) * aggroAt(b.phase + (st.mods.aggroShift || 0)).gap;
     }
 
+    // --- signature vortex (THE PULL / THE UNDERTOW): while the pattern reads (tele +
+    // active) the runner is dragged toward the boss. The force is capped under the
+    // SLOWEST operative's run speed (BULWARK 56), so the drag is always escapable by
+    // simply walking away — it pulls your line, it never pins you.
+    if (rt.pat && (rt.mode === 'tele' || rt.mode === 'active') && rt.pat.type === 'pull') {
+      const d = dist(b.x, b.y, p.x, p.y) || 1;
+      const f = Math.min(rt.pat.force, 26);
+      p.x = clamp(p.x + ((b.x - p.x) / d) * f * dt, AR.x0 + p.r, AR.x1 - p.r);
+      p.y = clamp(p.y + ((b.y - p.y) / d) * f * dt, AR.y0 + p.r, AR.y1 - p.r);
+    }
+
     // --- projectiles
     for (let i = st.proj.length - 1; i >= 0; i--) {
       const q = st.proj[i];
-      q.x += q.vx * dt; q.y += q.vy * dt;
+      if (q.shellT != null) {
+        // mortar shell: flies to its marked target, then bursts. The shell itself
+        // never hurts — the pop ring is the hazard (and BASTION can delete it).
+        q.shellT -= dt;
+        q.x += q.vx * dt; q.y += q.vy * dt;
+        if (q.shellT <= 0 || dist(q.x, q.y, q.tx, q.ty) < 5) {
+          popRing(st, q.tx, q.ty, q.pop, q.popSpeed);
+          st.proj.splice(i, 1);
+          st.events.push({ type: 'pop' });
+        } else if (q.x < AR.x0 - 6 || q.x > AR.x1 + 6 || q.y < AR.y0 - 6 || q.y > AR.y1 + 6) {
+          st.proj.splice(i, 1);
+        }
+        continue;
+      }
+      if (q.orbR) {
+        // orbiting halo: position rides the boss (it may move), release is radial and
+        // multiplier-free (walkable-pinned like the phase burst ring)
+        q.hold -= dt;
+        q.orbAng += 2.4 * dt;
+        q.x = b.x + Math.cos(q.orbAng) * q.orbR;
+        q.y = b.y + Math.sin(q.orbAng) * q.orbR;
+        if (q.hold <= 0) {
+          q.vx = Math.cos(q.orbAng) * q.relSpeed;
+          q.vy = Math.sin(q.orbAng) * q.relSpeed;
+          q.orbR = 0;
+        }
+      } else {
+        if (q.seek) {
+          // homing slugs steer toward the runner at a capped turn rate
+          const want = Math.atan2(p.y - q.y, p.x - q.x);
+          const cur = Math.atan2(q.vy, q.vx);
+          const da = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+          const maxT = q.seek * dt;
+          const na = cur + clamp(da, -maxT, maxT);
+          const sp = Math.hypot(q.vx, q.vy);
+          q.vx = Math.cos(na) * sp; q.vy = Math.sin(na) * sp;
+        }
+        q.x += q.vx * dt; q.y += q.vy * dt;
+        if (q.kind === 'ric' && q.bounces > 0) {
+          // ricochet plates: reflect off the arena walls while bounces remain
+          let bounced = false;
+          if (q.x < AR.x0 + q.r) { q.x = AR.x0 + q.r; q.vx = Math.abs(q.vx); bounced = true; }
+          else if (q.x > AR.x1 - q.r) { q.x = AR.x1 - q.r; q.vx = -Math.abs(q.vx); bounced = true; }
+          if (q.y < AR.y0 + q.r) { q.y = AR.y0 + q.r; q.vy = Math.abs(q.vy); bounced = true; }
+          else if (q.y > AR.y1 - q.r) { q.y = AR.y1 - q.r; q.vy = -Math.abs(q.vy); bounced = true; }
+          if (bounced) q.bounces--;
+        }
+      }
       if (q.x < AR.x0 - 6 || q.x > AR.x1 + 6 || q.y < AR.y0 - 6 || q.y > AR.y1 + 6) {
         st.proj.splice(i, 1); continue;
       }
@@ -438,15 +663,30 @@
       }
     }
 
-    // --- zones (bile pools)
+    // --- zones (bile pools; BILE BLOOM signatures grow wider while they live)
     for (const z of st.zones) {
       z.hitCd = Math.max(0, z.hitCd - dt);
+      if (z.grow) z.r = Math.min(z.r0 + z.grow * (st.t - z.born), z.r0 + 12);
       if (st.t > z.until) continue;
       if (z.hitCd <= 0 && dist(z.x, z.y, p.x, p.y) < z.r + p.r) {
         if (hurt(st, 'pool')) z.hitCd = 0.6;
       }
     }
     st.zones = st.zones.filter(z => st.t < z.until + 0.4);
+    if (st.wallSig && st.t > st.wallSig.until) st.wallSig = null;
+
+    // --- signature floor marks (armed mines + pinned reticles). The mark itself is
+    // safe to touch — the BURST is the hazard: mines pop early when crowded, marks
+    // pop when their fuse ends. Pop rings leave at <= 56 px/s: under a run.
+    for (let i = st.marks.length - 1; i >= 0; i--) {
+      const mk = st.marks[i];
+      mk.fuse -= dt;
+      if (mk.fuse <= 0 || (mk.mine && dist(mk.x, mk.y, p.x, p.y) < mk.r + 8)) {
+        popRing(st, mk.x, mk.y, mk.pop, mk.popSpeed);
+        st.marks.splice(i, 1);
+        st.events.push({ type: 'pop' });
+      }
+    }
 
     // --- beams (laser sweeps)
     for (const beam of st.beams) {

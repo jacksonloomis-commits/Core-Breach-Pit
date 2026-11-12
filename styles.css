@@ -146,6 +146,7 @@ body.no-crt::after { display: none; }
 .rb-name { font-size: 13px; letter-spacing: 0.1em; }
 .rb-title { color: var(--gray); font-size: 10px; margin-left: 6px; }
 .rb-hp { color: var(--crimlite); font-size: 10px; float: right; }
+.rb-sig { display: inline-block; color: var(--gold); font-size: 9px; letter-spacing: 0.14em; margin-left: 6px; border: 1px dashed #7a5a20; padding: 1px 5px; }
 .rb-brief { color: #c9d2e6; font-size: 11px; margin-top: 5px; line-height: 1.45; clear: both; }
 
 /* ---------- fight ---------- */
@@ -183,6 +184,9 @@ body.no-crt::after { display: none; }
 .ready-ov .r-rank { color: var(--gray); font-size: 11px; letter-spacing: 0.3em; }
 .ready-ov .r-boss { font-size: 26px; letter-spacing: 0.14em; text-shadow: 3px 3px 0 #05070d; }
 .ready-ov .r-brief { color: var(--gray); font-size: 11px; }
+.rsig { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--crimlite); background: rgba(143, 31, 46, 0.18); padding: 5px 14px; max-width: 92%; }
+.rsig .rsig-name { font-size: 12px; letter-spacing: 0.2em; }
+.rsig .rsig-blurb { color: var(--white); font-size: 11px; }
 .ready-ov .r-muts { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
 .rmut { display: flex; flex-direction: column; gap: 2px; border: 1px dashed var(--amber); padding: 5px 14px; max-width: 92%; }
 .rmut-name { color: var(--gold); font-size: 12px; letter-spacing: 0.2em; }
