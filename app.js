@@ -1,8 +1,13 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.19';
+  const BUILD = '2026.11.20';
   const UPDATE_LOG = [
+    { version: '2026.11.20', tag: 'PLAYER ACCOUNTS', items: [
+      'REAL ACCOUNTS (owner ask: "lets add actual accounts ... make a account verification system/login" + "make sure I keep my progress cuz I\'m at plat 2"): REGISTER in the hub header with a callsign and passcode — the passcode is stored ONLY as a salted SHA-256 digest (salted per account, fixed-time compare), never as text. The Pit is a static site on GitHub Pages, so accounts live per-browser; the hub shows who is banked (PILOT: NAME / LOG OUT) and guests keep playing as GUEST',
+      'MIGRATION LAW — NOTHING STRANDS YOUR PROGRESS: registering claims this browser\'s existing guest save VERBATIM (SR, rank, cosmetics, W/L — the whole slot), shows what it claimed ("CLAIMED — PLATINUM 2 · 1450 SR"), and marks the guest slot claimed so a second account starts fresh instead of inheriting a copy. Logging out drops you to the untouched guest slot; logging back in rehydrates the account slot. Slots are isolated — no bleed either way',
+      'THE TOP 5 BOARD IS HONEST (owner: "it should say ??? for all the top 5"): the old beta stand-in pilot names are GONE from the game — all five slots read ??? until a real registered pilot on this browser cracks the 4000 SR qualifying line, then the board fills by SR, five max, your row highlighted. A fresh browser shows a clean empty board: THE BOARD AWAITS'
+    ] },
     { version: '2026.11.19', tag: 'PLAIN TEMPO', items: [
       'THE PACING TAG IS RENAMED (owner report: "it keeps saying GAP in the mutations but idk what GAP is"): every pacing multiplier now reads TEMPO — how much sooner the boss cycles its patterns. Higher is always more dangerous: TEMPO ×1.25 = attacks come a quarter sooner, ×0.9 = it pauses a little longer. No more guessing which way the number cuts',
       'SAME NUMBERS, HONEST DIRECTION: SWIFT HORROR is now TEMPO ×1.176 (the old tag said 0.85 — lower meant faster, which is exactly why it read backwards), SIEGE is TEMPO ×0.893, HEATED AIR is TEMPO ×0.926. The fight title and the ladder show the composed TEMPO, rounded clean through fmtMul like every other multiplier',
@@ -92,7 +97,10 @@
 
   // ================= save (v2, ranked) =================
   const SKEY = 'cbp-save-v2';
+  PIT.ACCOUNTS.init(); // per-browser account store (register / login / logout below)
   let SAVE = load();
+  const bootPilot = PIT.ACCOUNTS.current(); // logged-in pilots rehydrate their own slot
+  if (bootPilot && bootPilot.save && bootPilot.save.v === 2) SAVE = { ...PIT.defaultRankedSave(), ...bootPilot.save };
   function load() {
     try {
       const v2 = JSON.parse(localStorage.getItem(SKEY));
@@ -102,7 +110,15 @@
     } catch {}
     return PIT.defaultRankedSave();
   }
-  function persist() { try { localStorage.setItem(SKEY, JSON.stringify(SAVE)); } catch {} }
+  function persist() {
+    // guests bank on the legacy slot; logged-in pilots bank on their account slot
+    // (isolated — logging in or out never bleeds progress between slots) and the
+    // honest Top 5 board updates from the same write
+    try {
+      if (PIT.ACCOUNTS.current()) { PIT.ACCOUNTS.setSave(SAVE); PIT.ACCOUNTS.maybeRecord(SAVE); }
+      else localStorage.setItem(SKEY, JSON.stringify(SAVE));
+    } catch {}
+  }
 
   // season rollover: the owner ends a season by bumping PIT.SEASON in engine.js;
   // the next load here awards that season's peak-rank cosmetic and opens the new one
@@ -121,6 +137,7 @@
   }
 
   function renderHub() {
+    renderPilotBar();
     // rank card — who you are on the ladder right now
     const prog = PIT.tierProgress(SAVE.sr);
     const rk = prog.rank;
@@ -153,16 +170,19 @@
       ladder.appendChild(row);
     });
 
-    // Top 5 board
+    // Top 5 board — REAL accounts only; empty slots read ??? (owner Task 47: the old
+    // beta mock names are gone — the board fills as local pilots crack 4000 SR)
     const lb = PIT.leaderboardWith(SAVE.sr);
     const t5 = $('#top5'); t5.innerHTML = '';
     lb.board.forEach((e, i) => {
-      const row = el('div', 't5-row' + (e.you ? ' you' : ''));
-      row.innerHTML = `<div class="t5-pos">${i + 1}</div><div class="t5-name">${e.name}</div><div class="t5-sr">${e.sr} SR</div>`;
+      const row = el('div', 't5-row' + (e.you ? ' you' : '') + (e.empty ? ' empty' : ''));
+      row.innerHTML = `<div class="t5-pos">${i + 1}</div><div class="t5-name">${e.name}</div><div class="t5-sr">${e.empty ? '—' : e.sr + ' SR'}</div>`;
       t5.appendChild(row);
     });
     const foot = el('div', 't5-foot');
-    foot.textContent = lb.you.inBoard ? 'YOU ARE ON THE BOARD' : `YOU — #${lb.you.pos} at ${SAVE.sr} SR` + (lb.qualify ? ' · TOP 5 QUALIFYING' : ` · qualify at ${PIT.TOP5_QUALIFY} SR`);
+    foot.textContent = lb.you.inBoard ? 'YOU ARE ON THE BOARD'
+      : lb.filled === 0 ? 'THE BOARD AWAITS — a registered pilot at 4000 SR takes slot #1'
+      : `YOU — #${lb.you.pos} at ${SAVE.sr} SR` + (lb.qualify ? ' · TOP 5 QUALIFYING' : ` · qualify at ${PIT.TOP5_QUALIFY} SR`);
     t5.appendChild(foot);
 
     // operatives — locked by SR now
@@ -264,6 +284,73 @@
 
   // ROUND ANNOUNCER: populate the pre-round overlay with the boss and its mutators
   // (names + blurbs, so the player reads what each twist does before the gates open).
+  // ================= PLAYER ACCOUNTS (register / login / logout) =================
+  // Per-browser accounts: the passcode never leaves this browser and is stored only
+  // as a salted SHA-256 digest. Registering claims the browser's unclaimed guest
+  // save verbatim (owner: "make sure I keep my progress cuz I'm at plat 2").
+  let pilotNote = '';
+  function renderPilotBar(note) {
+    const bar = $('#pilot-bar'); if (!bar) return;
+    if (note !== undefined) pilotNote = note;
+    const cur = PIT.ACCOUNTS.current();
+    bar.innerHTML = (cur
+      ? `<span class="pb-name">PILOT: ${cur.name}</span><button id="btn-logout" class="btn ghost">LOG OUT</button>`
+      : `<span class="pb-name">GUEST — progress banks on this browser only</span><button id="btn-auth" class="btn gold">REGISTER / LOG IN</button>`)
+      + (pilotNote ? `<div class="pb-note">${pilotNote}</div>` : '');
+    const lo = $('#btn-logout');
+    if (lo) lo.onclick = () => {
+      PIT.ACCOUNTS.logout();
+      SAVE = load(); // back to the guest slot — the pilot's runs stay in their account
+      pilotNote = '';
+      persist();
+      renderHub();
+    };
+    const au = $('#btn-auth');
+    if (au) au.onclick = () => openAuth('register');
+  }
+  let authMode = 'register';
+  function setAuthMode(m) {
+    authMode = m;
+    $('#auth-title').textContent = m === 'register' ? 'REGISTER' : 'LOG IN';
+    $('#auth-go').textContent = m === 'register' ? 'REGISTER' : 'LOG IN';
+    $('#auth-switch').textContent = m === 'register' ? 'LOG IN INSTEAD' : 'REGISTER A NEW CALLSIGN';
+    $('#auth-msg').textContent = '';
+  }
+  function openAuth(m) {
+    setAuthMode(m);
+    $('#auth-name').value = '';
+    $('#auth-pass').value = '';
+    $('#auth-ov').hidden = false;
+    $('#auth-name').focus();
+  }
+  function closeAuth() { $('#auth-ov').hidden = true; }
+  function authSubmit() {
+    const msg = $('#auth-msg');
+    const res = authMode === 'register'
+      ? PIT.ACCOUNTS.register($('#auth-name').value, $('#auth-pass').value)
+      : PIT.ACCOUNTS.login($('#auth-name').value, $('#auth-pass').value);
+    if (!res.ok) { msg.textContent = res.error; return; }
+    const cur = PIT.ACCOUNTS.current();
+    SAVE = { ...PIT.defaultRankedSave(), ...(cur.save || {}) };
+    // a claimed save may predate the season — rerun the rollover flow so the reward
+    // banner fires exactly like it does on a fresh boot
+    if (SAVE.season !== PIT.SEASON) seasonBanner = PIT.seasonEnd(SAVE);
+    persist();
+    pilotNote = res.claimed
+      ? `CLAIMED — this browser's old save (${PIT.rankLabel(PIT.rankFor(res.claimed.sr))} · ${res.claimed.sr} SR) is now your account's save`
+      : (authMode === 'login' ? '' : 'registered — your runs now bank under ' + cur.name);
+    renderHub();
+    closeAuth();
+  }
+  $('#auth-go').addEventListener('click', authSubmit);
+  $('#auth-switch').addEventListener('click', () => setAuthMode(authMode === 'register' ? 'login' : 'register'));
+  $('#auth-close').addEventListener('click', closeAuth);
+  document.addEventListener('keydown', (e) => {
+    if (!$('#auth-ov') || $('#auth-ov').hidden) return;
+    if (e.key === 'Escape') closeAuth();
+    else if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName === 'INPUT') authSubmit();
+  });
+
   function showReady(rk) {
     const ov = $('#ready-ov');
     $('#ready-rank').textContent = PIT.rankLabel(rk) + ' — ROUND INCOMING';

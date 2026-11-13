@@ -202,3 +202,20 @@ body.no-crt::after { display: none; }
   background: var(--deep); border-top: 1px solid var(--wall);
   padding: 4px 0; letter-spacing: 0.2em;
 }
+
+/* ================= PLAYER ACCOUNTS (Task 47) ================= */
+.pilot-bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+.pilot-bar .pb-name { color: var(--gray); font-size: 12px; letter-spacing: 0.08em; }
+.pilot-bar .btn { padding: 5px 12px; font-size: 11px; }
+.pilot-bar .pb-note { width: 100%; color: var(--gold, #d9a441); font-size: 11px; letter-spacing: 0.05em; }
+.auth-ov { align-items: center; justify-content: center; z-index: 60; }
+.auth-panel { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--crimlite, #8f1f2e); background: var(--panel, rgba(8, 10, 18, 0.96)); padding: 22px 26px; max-width: 420px; width: 92%; }
+.auth-title { font-size: 22px; letter-spacing: 0.18em; }
+.auth-note { color: var(--gray); font-size: 11px; line-height: 1.5; }
+.auth-lab { display: flex; flex-direction: column; gap: 4px; color: var(--gray); font-size: 11px; letter-spacing: 0.14em; }
+.auth-in { background: #05070d; border: 1px solid var(--crimlite, #8f1f2e); color: var(--white, #e8e6e3); padding: 8px 10px; font-size: 14px; letter-spacing: 0.06em; outline: none; }
+.auth-in:focus { border-color: var(--gold, #d9a441); }
+.auth-msg { min-height: 16px; color: var(--crimson, #c23349); font-size: 11px; letter-spacing: 0.05em; }
+.auth-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.t5-row.empty .t5-name { color: var(--gray); opacity: 0.55; }
+.t5-row.empty .t5-sr { color: var(--gray); opacity: 0.4; }

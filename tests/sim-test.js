@@ -676,12 +676,43 @@ console.log('--- Ranked ladder logic ---');
       res.badge === 'S0-PLATINUM2' && s.season === PIT.SEASON && s.cosmetics.includes('S0-PLATINUM2'));
     check('season rollover keeps SR (never resets)', s.sr === 1200);
   }
-  // Top 5 board
+  // Top 5 board — REAL accounts only; empty slots read ??? (owner Task 47)
   {
-    const lb = PIT.leaderboardWith(5085);
-    check('YOU slots into the board by SR (5085 -> #4)', lb.you.pos === 4 && lb.you.inBoard && lb.board[3].you);
-    check('board is sorted by SR desc', lb.board.every((e, i) => i === 0 || lb.board[i - 1].sr >= e.sr));
+    const mkStore = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+    PIT.ACCOUNTS.init(mkStore());
+    const empty = PIT.leaderboardWith(0);
+    check('a fresh browser shows an honest board: five ??? slots, nothing filled',
+      empty.board.length === 5 && empty.board.every(e => e.empty && e.name === '???') && empty.filled === 0);
     check('Top 5 qualifying number is 4000', PIT.TOP5_QUALIFY === 4000 && PIT.leaderboardWith(4000).qualify && !PIT.leaderboardWith(3999).qualify);
+    PIT.ACCOUNTS.register('Loomis', 'plat2pass');
+    check('maybeRecord refuses sub-qualifying SR (no fake slots)', PIT.ACCOUNTS.maybeRecord({ sr: 3999 }) === false && PIT.ACCOUNTS.boardEntries().length === 0);
+    PIT.ACCOUNTS.maybeRecord({ sr: 4399 });
+    PIT.ACCOUNTS.logout();
+    PIT.ACCOUNTS.register('SecondPilot', 'hunter2pass');
+    PIT.ACCOUNTS.maybeRecord({ sr: 4120 });
+    PIT.ACCOUNTS.logout(); // become a guest so the YOU-position checks test the guest path
+    const lb = PIT.leaderboardWith(5085); // a guest sweeping past both
+    check('board fills with REAL pilots by SR desc (4399, 4120) and ??? fills the rest',
+      lb.board[0].name === 'Loomis' && lb.board[0].sr === 4399 &&
+      lb.board[1].name === 'SecondPilot' && lb.board[1].sr === 4120 &&
+      lb.board.slice(2).every(e => e.empty && e.name === '???') && lb.filled === 2);
+    check('board is sorted by SR desc (real rows)', lb.board.filter(e => !e.empty).every((e, i, a) => i === 0 || a[i - 1].sr >= e.sr));
+    check('YOU position counts only real entries (guest 5085 -> #1, on the board)', lb.you.pos === 1 && lb.you.inBoard);
+    check('below the qualifying line you are nobody on the board', PIT.leaderboardWith(1000).you.inBoard === false && PIT.leaderboardWith(1000).you.pos === 3);
+    PIT.ACCOUNTS.login('SecondPilot', 'hunter2pass'); // back on the account for the highlight check
+    check('your own recorded row is highlighted and positioned among real entries',
+      (() => { const me = PIT.leaderboardWith(4120); return me.board[1].you === true && me.you.pos === 2 && me.you.inBoard; })());
+    check('re-recording your own SR replaces the row (no dupe pilots)', PIT.ACCOUNTS.maybeRecord({ sr: 4450 }) &&
+      PIT.ACCOUNTS.boardEntries().filter(e => e.name === 'SecondPilot').length === 1 && PIT.ACCOUNTS.boardEntries()[0].sr === 4450);
+    // six qualified pilots: board keeps the highest five, honestly
+    for (const [n, sr] of [['Third', 4401], ['Fourth', 4300], ['Fifth', 4250], ['Sixth', 4200]]) {
+      PIT.ACCOUNTS.logout();
+      PIT.ACCOUNTS.register(n, 'boardpass-' + n);
+      PIT.ACCOUNTS.maybeRecord({ sr });
+    }
+    const full = PIT.ACCOUNTS.boardEntries();
+    check('six qualified pilots cap the board at five, highest SRs kept',
+      full.length === 5 && full.map(e => e.sr).join(',') === '4450,4401,4399,4300,4250' && full.every(e => e.sr >= 4200));
   }
 }
 
@@ -1121,6 +1152,70 @@ console.log('--- Boss signatures: nobody shares an identity ---');
 }
 
 // ================= house guards =================
+// ================= PLAYER ACCOUNTS (owner Task 47) =================
+console.log('--- Player accounts: real login, honest board, nothing strands ---');
+{
+  const mkStore = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
+  const { createHash } = require('crypto');
+  // ---------- SHA-256 proven against node:crypto before anything trusts it ----------
+  const shaCases = ['', 'abc', 'Loomis', 'salt0123456789abcdef:plat2pass', 'a'.repeat(55), 'a'.repeat(56), 'a'.repeat(63), 'a'.repeat(64), 'x:y:z pass word!!', 'café ☕ Ünïcode', 'p'.repeat(119), 'q'.repeat(120)];
+  const shaBad = shaCases.filter(c => PIT.sha256(c) !== createHash('sha256').update(c, 'utf8').digest('hex'));
+  check('sha256 is the standard: ' + shaCases.length + ' inputs match node:crypto (incl. 55/56/63/64-byte boundaries)', shaBad.length === 0, shaBad.map(c => JSON.stringify(c.slice(0, 16))).join(' '));
+  check('sha256 known-answer vectors (FIPS)', PIT.sha256('') === 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' &&
+    PIT.sha256('abc') === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  // ---------- register / login / session ----------
+  const store = mkStore();
+  PIT.ACCOUNTS.init(store);
+  check('register rejects bad callsigns (too short, illegal chars, too long)',
+    !PIT.ACCOUNTS.register('ab', 'longenough').ok && !PIT.ACCOUNTS.register('has<svg>', 'longenough').ok &&
+    !PIT.ACCOUNTS.register('thiscalliswaytoolong17', 'longenough').ok);
+  check('register rejects short passcodes', !PIT.ACCOUNTS.register('ValidName', 'short').ok);
+  const reg = PIT.ACCOUNTS.register('Loomis', 'plat2pass');
+  check('register succeeds: session set, pilot recorded', reg.ok && reg.claimed === null && PIT.ACCOUNTS.current() && PIT.ACCOUNTS.current().name === 'Loomis');
+  const accRow = JSON.parse(store.getItem('cbp-accounts-v1')).loomis;
+  check('passcode is stored ONLY as salt+hash (never plaintext, never unsalted)',
+    accRow && /^[0-9a-f]{32}$/.test(accRow.salt) && /^[0-9a-f]{64}$/.test(accRow.hash) &&
+    accRow.hash !== PIT.sha256('plat2pass') && !JSON.stringify(accRow).includes('plat2pass'));
+  check('duplicate callsign rejected case-insensitively', !PIT.ACCOUNTS.register('LOOMIS', 'whatever-pass').ok);
+  check('wrong passcode + unknown callsign rejected; failed login never sets a session', (() => {
+    PIT.ACCOUNTS.logout();
+    const bad = PIT.ACCOUNTS.login('Loomis', 'wrongpass');
+    const none = PIT.ACCOUNTS.login('GhostPilot', 'whatever-pass');
+    const noSession = PIT.ACCOUNTS.current() === null;
+    const good = PIT.ACCOUNTS.login('loomis', 'plat2pass'); // callsign match is case-insensitive
+    return !bad.ok && bad.error === 'wrong passcode' && !none.ok && noSession && good.ok && good.name === 'Loomis';
+  })());
+  // ---------- MIGRATION: the plat-2 save survives (owner: "make sure I keep my progress cuz I'm at plat 2") ----------
+  const store2 = mkStore();
+  store2.setItem('cbp-save-v2', JSON.stringify({ v: 2, sr: 1450, peakSr: 1470, wins: 31, losses: 12, season: PIT.SEASON, cosmetics: [], chars: ['volt'], char: 'volt', runs: 43 }));
+  PIT.ACCOUNTS.init(store2);
+  const reg2 = PIT.ACCOUNTS.register('PlatHero', 'keepmyruns');
+  check('REGISTER CLAIMS the guest save verbatim (1450 SR, record, runs — nothing strands)',
+    reg2.ok && !!reg2.claimed && reg2.claimed.sr === 1450 && PIT.ACCOUNTS.current().save.sr === 1450 &&
+    PIT.ACCOUNTS.current().save.wins === 31 && PIT.ACCOUNTS.current().save.runs === 43);
+  check('the guest slot stays as a backup after the claim', JSON.parse(store2.getItem('cbp-save-v2')).sr === 1450);
+  check('a SECOND account starts fresh (claim marker burned, no inherited copy)', (() => {
+    PIT.ACCOUNTS.logout();
+    const reg3 = PIT.ACCOUNTS.register('FreshFace', 'brandnew');
+    return reg3.ok && reg3.claimed === null && PIT.ACCOUNTS.current().save === null;
+  })());
+  // ---------- isolation: slots never bleed ----------
+  check('progress written under FreshFace never touches PlatHero\'s slot', (() => {
+    PIT.ACCOUNTS.setSave({ v: 2, sr: 10, wins: 1, losses: 0, peakSr: 10, season: PIT.SEASON, cosmetics: [], chars: ['volt'], char: 'volt', runs: 1 });
+    const accs = JSON.parse(store2.getItem('cbp-accounts-v1'));
+    return accs.freshface.save.sr === 10 && accs.plathero.save.sr === 1450;
+  })());
+  check('logout drops to the guest slot; login rehydrates the account slot', (() => {
+    PIT.ACCOUNTS.logout();
+    const afterOut = PIT.ACCOUNTS.current();
+    const back = PIT.ACCOUNTS.login('PlatHero', 'keepmyruns');
+    return afterOut === null && back.ok && back.save && back.save.sr === 1450 && PIT.ACCOUNTS.current().save.sr === 1450;
+  })());
+  check('fresh accounts with no save start clean (a login on a new browser gets defaults, not zeros)',
+    PIT.ACCOUNTS.logout() === undefined && PIT.ACCOUNTS.register('CleanSlate', 'any-six+') &&
+    (() => { const c = PIT.ACCOUNTS.current(); return c.save === null; })());
+}
+
 console.log('--- House guards ---');
 {
   const fs = require('fs');
@@ -1128,9 +1223,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.19', APP.includes("const BUILD = '2026.11.19'"));
-  check('app.js update log leads with PLAIN TEMPO', APP.includes("tag: 'PLAIN TEMPO'") && APP.indexOf("tag: 'PLAIN TEMPO'") < APP.indexOf("tag: 'SIGNATURE WAVE'"));
-  check('app.js update log keeps the SIGNATURE WAVE entry', APP.includes("tag: 'SIGNATURE WAVE'") && APP.indexOf("tag: 'SIGNATURE WAVE'") < APP.indexOf("tag: 'FULL BENCH'"));
+  check('app.js pins BUILD 2026.11.20', APP.includes("const BUILD = '2026.11.20'"));
+  check('app.js update log leads with PLAYER ACCOUNTS', APP.includes("tag: 'PLAYER ACCOUNTS'") && APP.indexOf("tag: 'PLAYER ACCOUNTS'") < APP.indexOf("tag: 'PLAIN TEMPO'"));
+  check('app.js update log keeps the PLAIN TEMPO entry', APP.includes("tag: 'PLAIN TEMPO'") && APP.indexOf("tag: 'PLAIN TEMPO'") < APP.indexOf("tag: 'SIGNATURE WAVE'"));
   check('app.js logs the ROUND ANNOUNCER entry', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
   check('app.js logs the ROUND VARIETY entry', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
   check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
@@ -1144,9 +1239,30 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.19 // PLAIN TEMPO', IDX.includes('BUILD 2026.11.19 // CORE BREACH: PIT — PLAIN TEMPO'));
+  check('index.html footer stamps BUILD 2026.11.20 // PLAYER ACCOUNTS', IDX.includes('BUILD 2026.11.20 // CORE BREACH: PIT — PLAYER ACCOUNTS'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110o', busts.length === 7 && busts.every(t => t === '?v=20261110o'), busts.join(','));
+  check('all 7 asset tags bust at 20261110p', busts.length === 7 && busts.every(t => t === '?v=20261110p'), busts.join(','));
+  check('PLAYER ACCOUNTS UI: auth overlay + pilot bar markup exist',
+    IDX.includes('id="auth-ov"') && IDX.includes('id="auth-name"') && IDX.includes('id="auth-pass"') &&
+    IDX.includes('id="auth-go"') && IDX.includes('id="auth-switch"') && IDX.includes('id="auth-close"') &&
+    IDX.includes('id="pilot-bar"') && IDX.includes('class="auth-panel"'));
+  check('PLAYER ACCOUNTS wiring: register/login/logout/session + guest claim note',
+    APP.includes('PIT.ACCOUNTS.register') && APP.includes('PIT.ACCOUNTS.login') && APP.includes('PIT.ACCOUNTS.logout') &&
+    APP.includes('PIT.ACCOUNTS.current()') && APP.includes("openAuth('register')") &&
+    APP.includes('PILOT: ${cur.name}') && APP.includes('GUEST — progress banks on this browser only') &&
+    APP.includes('CLAIMED — this browser\'s old save'));
+  check('persist() routes by session: account slot when logged in, legacy guest slot otherwise',
+    APP.includes('PIT.ACCOUNTS.setSave(SAVE)') && APP.includes('PIT.ACCOUNTS.maybeRecord(SAVE)') &&
+    APP.includes('localStorage.setItem(SKEY, JSON.stringify(SAVE))'));
+  check('Top 5 render is honest: empty slots draw ???, board foot says what fills them',
+    APP.includes("(e.empty ? ' empty' : '')") && APP.includes("e.empty ? '—' : e.sr + ' SR'") &&
+    APP.includes('THE BOARD AWAITS'));
+  check('the mock pilot names are gone everywhere (owner: "it should say ??? for all the top 5")',
+    !APP.includes('Numbugger') && !ENG.includes('Numbugger') && !IDX.includes('Numbugger') &&
+    !APP.includes('TOP5_MOCK') && !ENG.includes('TOP5_MOCK'));
+  check('how-to teaches accounts and the honest board', IDX.includes('<b>Accounts:</b> REGISTER') &&
+    IDX.includes('salted hash') && IDX.includes('no fake names, ever'));
+  check('engine exports the accounts module and its sha256', ENG.includes('ACCOUNTS: { init: accInit') && ENG.includes('function sha256'));
   check('SIGNATURE WAVE UI: the announcer names the signature and the roster lists it',
     APP.includes("$('#ready-sig')") && APP.includes('SIGNATURE — ') && APP.includes('class="rb-sig"'));
   check('SIGNATURE WAVE markup + styles: ready-sig element, .rsig card, roster sig tag, howto',

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CORE BREACH: PIT // Ranked Boss-Rush Arena</title>
-  <link rel="stylesheet" href="styles.css?v=20261110o">
+  <link rel="stylesheet" href="styles.css?v=20261110p">
 </head>
 <body>
   <div id="app">
@@ -15,6 +15,7 @@
         <h1 class="title">CORE BREACH<span class="t-sub">// PIT</span></h1>
         <p class="tagline">THE CRIMSON TIDE SENDS ITS LIEUTENANTS. SEND THEM BACK. CLIMB THE LADDER.</p>
         <div id="hub-stats" class="hub-stats"></div>
+        <div id="pilot-bar" class="pilot-bar"></div>
       </header>
 
       <button id="btn-play" class="btn gold big">ENTER THE PIT</button>
@@ -47,6 +48,22 @@
             <p><b>Every boss has a signature:</b> a named gimmick only it owns — homing spore drift, mines that burst when crowded, halos that circle and burst, walls with one gap, shells lobbed at marked squares, a pull that drags your line, a mark on the square you stand on, a teleport step, ricochet slugs, pools that bloom. The announcer names it before every round; sharing attacks is fine, sharing an identity is not.</p>
             <p><b>Mutators:</b> every queue can roll house twists — FRAIL, SWIFT HORROR, SIEGE, HEATED AIR, BROOD BLIGHT, VOLATILE CORE, ADRENALINE, BOUNTY. <b>TEMPO</b> is the boss's pacing: ×1.25 cycles its attacks a quarter sooner, ×0.9 pauses a little longer — higher is always faster. Bronze mostly stays clean; the deep ranks stack two. Each round opens with a countdown that names the boss and every mutator with what it does — read it, then FIGHT. No two rounds play the same.</p>
             <p><b>Ranked:</b> each queue rolls a random boss from your rank's pool. Wins bank SR by the hearts you keep; flatlining costs SR. Higher ranks send the same lieutenants with more HP and tighter pacing — Silver walls you with the <b>DEATHWARRANT weight class</b>. GHOST unlocks at Silver (500 SR), BULWARK at Platinum (1100 SR).</p>
+            <p><b>Accounts:</b> REGISTER in the hub header to bank your progress under a callsign — passcode stored only as a salted hash, in this browser (the Pit is a static site; there is no server). Registering claims this browser's existing progress automatically, so nothing is lost. The Top 5 board is honest: every slot reads <b>???</b> until a real registered pilot on this browser cracks 4000 SR — no fake names, ever.</p>
+          </div>
+          <!-- auth overlay: hub-level, opens from the pilot bar -->
+          <div id="auth-ov" class="result-ov auth-ov" hidden>
+            <div class="auth-panel">
+              <div id="auth-title" class="auth-title">REGISTER</div>
+              <p class="auth-note">Accounts live in THIS browser — callsign + passcode, passcode salted+hashed, never stored as text. Registering claims this browser's existing progress.</p>
+              <label class="auth-lab">CALLSIGN<input id="auth-name" class="auth-in" maxlength="16" autocomplete="off" spellcheck="false" placeholder="3-16 chars: letters, numbers, _ -"></label>
+              <label class="auth-lab">PASSCODE<input id="auth-pass" class="auth-in" type="password" maxlength="64" placeholder="at least 6 characters"></label>
+              <div id="auth-msg" class="auth-msg"></div>
+              <div class="auth-btns">
+                <button id="auth-go" class="btn gold">REGISTER</button>
+                <button id="auth-switch" class="btn ghost">LOG IN INSTEAD</button>
+                <button id="auth-close" class="btn ghost">CLOSE</button>
+              </div>
+            </div>
           </div>
           <h2 class="sect">OPTIONS</h2>
           <label class="opt"><input type="checkbox" id="opt-crt"> CRT scanlines</label>
@@ -89,13 +106,13 @@
     </section>
   </div>
 
-  <footer id="build-foot">BUILD 2026.11.19 // CORE BREACH: PIT — PLAIN TEMPO</footer>
+  <footer id="build-foot">BUILD 2026.11.20 // CORE BREACH: PIT — PLAYER ACCOUNTS</footer>
 
-  <script src="palette.js?v=20261110o"></script>
-  <script src="chars.js?v=20261110o"></script>
-  <script src="bosses.js?v=20261110o"></script>
-  <script src="engine.js?v=20261110o"></script>
-  <script src="audio.js?v=20261110o"></script>
-  <script src="app.js?v=20261110o"></script>
+  <script src="palette.js?v=20261110p"></script>
+  <script src="chars.js?v=20261110p"></script>
+  <script src="bosses.js?v=20261110p"></script>
+  <script src="engine.js?v=20261110p"></script>
+  <script src="audio.js?v=20261110p"></script>
+  <script src="app.js?v=20261110p"></script>
 </body>
 </html>

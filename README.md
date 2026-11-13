@@ -20,7 +20,11 @@ Stars are gone. Every queue rolls a random boss from your rank's pool — and **
 | CRIMSON 1–3 | 2500–3500 | 1.85 / 1.33 | MAELSTROM · GORE PRELATE · NULL SOVEREIGN · THE MARSHAL · THE GORGET · VESPER |
 | IRIDESCENT | 3500+ | 2.0 / 1.43 | THE GLUTTON · PALE LEVIATHAN · OLD WATER · THE ABYSSAL ARCHIVE · THE LAST SHORE · TIDE UNBOUND |
 
-Top 5 board: crack the board by SR (qualifying 4000). Season 1 is live.
+**Top 5 board: five ??? slots until real pilots earn them.** The board lists registered accounts on this browser only — no fabricated names, ever. A pilot's best SR takes a slot once it clears the qualifying line (4000); the board caps at five, sorted by SR, your row highlighted. Fresh browser = clean board. **Season 1 is live.**
+
+## Accounts (register / login)
+
+REGISTER in the hub header with a callsign (3-16 chars) and a passcode (6+). The passcode never leaves your browser and is stored only as a **salted SHA-256 digest** — salted per account, fixed-time compare, never plaintext. The Pit is a static site on GitHub Pages, so accounts are **per-browser**: register on a device and your progress banks under that callsign there; log in on the same browser to rehydrate it. Registering **claims this browser's existing guest save verbatim** — SR, rank, cosmetics, record — so nothing strands (the owner's plat 2 survived the migration untouched, by test). The guest slot stays behind as a backup; a second account starts fresh instead of inheriting a copy; logout drops you to the guest slot and login brings the account slot back. Slots are isolated by tests.
 
 ## Every round rolls a twist — ROUND VARIETY mutators
 
@@ -115,6 +119,6 @@ Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, 
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.19 // PLAIN TEMPO** (bust `20261110o`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.20 // PLAYER ACCOUNTS** (bust `20261110p`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

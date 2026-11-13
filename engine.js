@@ -876,18 +876,186 @@
 
   // ---------- Top 5 (season leaderboard) ----------
   const TOP5_QUALIFY = 4000; // Iridescent Top-5 qualifying number (owner spec)
-  const TOP5_MOCK = [ // beta stand-ins until a real backend exists; YOU slots in by SR
-    { name: 'Numbugger', sr: 8900 },
-    { name: 'Jeff', sr: 6600 },
-    { name: 'Biffle', sr: 5090 },
-    { name: 'Loomis', sr: 5080 },
-    { name: 'Peterbot', sr: 4900 }
+
+  // ---------- SHA-256 (sync, FIPS 180-4) ----------
+  // crypto.subtle is async and would thread promises through the save path; the
+  // headless suite needs deterministic sync calls. Standard compact form — the suite
+  // cross-checks it against Node's crypto module before anything trusts it.
+  // Length encoding assumes messages < 512 MiB (passcodes and salts qualify).
+  const K256 = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
   ];
+  function sha256(str) {
+    const utf8 = [];
+    for (let i = 0; i < str.length; i++) {
+      let c = str.codePointAt(i);
+      if (c > 0xffff) i++;
+      if (c < 0x80) utf8.push(c);
+      else if (c < 0x800) utf8.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) utf8.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else utf8.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    const len = utf8.length;
+    const total = Math.ceil((len + 9) / 64) * 64;
+    const buf = new Array(total).fill(0);
+    for (let i = 0; i < len; i++) buf[i] = utf8[i];
+    buf[len] = 0x80;
+    const bits = len * 8;
+    buf[total - 4] = (bits >>> 24) & 0xff; // low 32 bits of the 64-bit length (high word is 0)
+    buf[total - 3] = (bits >>> 16) & 0xff;
+    buf[total - 2] = (bits >>> 8) & 0xff;
+    buf[total - 1] = bits & 0xff;
+    const rotr = (x, n) => ((x >>> n) | (x << (32 - n))) >>> 0;
+    let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a,
+        h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+    const w = new Array(64);
+    for (let off = 0; off < total; off += 64) {
+      for (let t = 0; t < 16; t++) {
+        w[t] = ((buf[off + t * 4] << 24) | (buf[off + t * 4 + 1] << 16) | (buf[off + t * 4 + 2] << 8) | buf[off + t * 4 + 3]) >>> 0;
+      }
+      for (let t = 16; t < 64; t++) {
+        const s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3);
+        const s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) >>> 0;
+      }
+      let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+      for (let t = 0; t < 64; t++) {
+        const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+        const ch = (e & f) ^ (~e & g);
+        const t1 = (h + S1 + ch + K256[t] + w[t]) >>> 0;
+        const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+        const mj = (a & b) ^ (a & c) ^ (b & c);
+        const t2 = (S0 + mj) >>> 0;
+        h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+      }
+      h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+      h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+    }
+    return [h0, h1, h2, h3, h4, h5, h6, h7].map(x => x.toString(16).padStart(8, '0')).join('');
+  }
+
+  // ---------- PLAYER ACCOUNTS (per-browser) ----------
+  // GitHub Pages serves files, not users — there is no server to hold accounts. So
+  // accounts live in this browser's localStorage: callsign + passcode (salted
+  // SHA-256, never the passcode itself), one save slot per account. OWNER ASK
+  // (Task 47): real login, an HONEST Top 5 board (??? until a real local account
+  // cracks 4000 SR — the old fabricated stand-in row is gone), and the legacy guest
+  // save survives migration (owner is PLATINUM 2 — nothing may strand it).
+  const ACC_KEY = 'cbp-accounts-v1';
+  const SES_KEY = 'cbp-session-v1';
+  const BOARD_KEY = 'cbp-board-v1';
+  const GUEST_SAVE_KEY = 'cbp-save-v2';      // the guest slot app.js has always used
+  const GUEST_CLAIM_KEY = 'cbp-guest-claimed-v1'; // one claim per browser
+  let ACC_STORE = null;
+  function memStore() { // storage shim shape (the suite injects exactly this)
+    const m = new Map();
+    return {
+      getItem: (k) => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => { m.set(k, String(v)); },
+      removeItem: (k) => { m.delete(k); }
+    };
+  }
+  function accInit(storage) { ACC_STORE = storage || (typeof localStorage !== 'undefined' ? localStorage : memStore()); }
+  function accRead(key, fallback) {
+    if (!ACC_STORE) accInit();
+    try { const raw = ACC_STORE.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
+  }
+  function accWrite(key, val) {
+    if (!ACC_STORE) accInit();
+    ACC_STORE.setItem(key, JSON.stringify(val));
+  }
+  function randSalt() { // 16 bytes -> 32 hex chars
+    let s = '';
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const b = new Uint8Array(16); crypto.getRandomValues(b);
+      for (const x of b) s += x.toString(16).padStart(2, '0');
+    } else for (let i = 0; i < 16; i++) s += Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+    return s;
+  }
+  const hashPass = (salt, pass) => sha256(salt + ':' + pass);
+  // fixed-time compare (same length by construction — both hex digests)
+  function passEq(a, b) {
+    let d = a.length ^ b.length;
+    for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return d === 0;
+  }
+  function accReadAll() { return accRead(ACC_KEY, {}); }
+  function validCallsign(n) { return /^[A-Za-z0-9][A-Za-z0-9 _-]{2,15}$/.test(n); }
+  function register(name, pass) {
+    const nm = String(name || '').trim();
+    if (!validCallsign(nm)) return { ok: false, error: 'CALLSIGN RULES: 3-16 chars — letters, numbers, space, _ or -' };
+    if (typeof pass !== 'string' || pass.length < 6) return { ok: false, error: 'PASSCODE RULES: at least 6 characters' };
+    const all = accReadAll();
+    const key = nm.toLowerCase();
+    if (all[key]) return { ok: false, error: 'that callsign is already registered on this browser' };
+    const salt = randSalt();
+    const acc = { name: nm, salt, hash: hashPass(salt, pass), save: null, created: Date.now() };
+    // MIGRATION LAW (owner: "make sure I keep my progress cuz I'm at plat 2"): a
+    // register claims this browser's unclaimed guest save VERBATIM — SR, rank,
+    // cosmetics, everything. The guest slot is kept as a backup, never deleted, and
+    // marked claimed so a SECOND account starts fresh instead of inheriting a copy.
+    const guest = accRead(GUEST_SAVE_KEY, null);
+    let claimed = null;
+    if (guest && guest.v === 2 && !ACC_STORE.getItem(GUEST_CLAIM_KEY)) {
+      acc.save = guest; claimed = guest;
+      ACC_STORE.setItem(GUEST_CLAIM_KEY, String(Date.now()));
+    }
+    all[key] = acc;
+    accWrite(ACC_KEY, all);
+    accWrite(SES_KEY, key);
+    return { ok: true, name: nm, claimed };
+  }
+  function login(name, pass) {
+    const key = String(name || '').trim().toLowerCase();
+    const acc = accReadAll()[key];
+    if (!acc) return { ok: false, error: 'no pilot registered under that callsign' };
+    if (!passEq(hashPass(acc.salt, String(pass || '')), acc.hash)) return { ok: false, error: 'wrong passcode' };
+    accWrite(SES_KEY, key);
+    return { ok: true, name: acc.name, save: acc.save };
+  }
+  function logout() {
+    if (!ACC_STORE) accInit();
+    ACC_STORE.removeItem(SES_KEY);
+  }
+  function current() {
+    const key = accRead(SES_KEY, null);
+    if (!key) return null;
+    const acc = accReadAll()[key];
+    return acc ? { name: acc.name, save: acc.save, key } : null;
+  }
+  function setSave(save) { // persist() routes here when a pilot is logged in
+    const cur = current(); if (!cur) return;
+    const all = accReadAll();
+    if (all[cur.key]) { all[cur.key].save = save; accWrite(ACC_KEY, all); }
+  }
+  // Top 5 board: REAL local accounts only — no fabricated names, ever again.
+  function boardEntries() { return accRead(BOARD_KEY, []); }
+  function maybeRecord(save) { // called from persist(); idempotent upsert per pilot
+    const cur = current(); if (!cur || !save || typeof save.sr !== 'number') return false;
+    if (save.sr < TOP5_QUALIFY) return false;
+    const list = boardEntries().filter(e => e.key !== cur.key);
+    list.push({ key: cur.key, name: cur.name, sr: save.sr, rank: rankFor(save.sr).name, at: Date.now() });
+    list.sort((a, b) => b.sr - a.sr);
+    accWrite(BOARD_KEY, list.slice(0, 5));
+    return true;
+  }
   function leaderboardWith(sr) {
-    const all = TOP5_MOCK.map(e => ({ ...e })).concat([{ name: 'YOU', sr, you: true }]);
-    all.sort((a, b) => b.sr - a.sr);
-    const youIdx = all.findIndex(e => e.you);
-    return { board: all.slice(0, 5), you: { pos: youIdx + 1, sr, inBoard: youIdx >= 0 && youIdx < 5 }, qualify: sr >= TOP5_QUALIFY };
+    const entries = boardEntries();
+    const cur = current();
+    let self = null;
+    if (cur) { self = entries.find(e => e.key === cur.key) || null; if (self) self.you = true; }
+    const others = entries.filter(e => e !== self);
+    const board = [];
+    for (let i = 0; i < 5; i++) board.push(i < entries.length ? { ...entries[i] } : { name: '???', sr: null, empty: true });
+    const pos = self ? entries.indexOf(self) + 1 : 1 + others.filter(e => e.sr > sr).length;
+    return { board, you: { pos, sr, inBoard: !!self || (sr >= TOP5_QUALIFY && pos <= 5) }, qualify: sr >= TOP5_QUALIFY, filled: entries.length };
   }
 
   // ---------- seasons ----------
@@ -931,7 +1099,8 @@
     W, H, HUD, AR, CHARS, BOSSES, createRun, step, hurt, mulberry32, segDist, clamp, dist,
     AGGRO, aggroAt, MUTATORS, rollMutators, fmtMul,
     SR, srDelta, RANKS, RANK_MODS, rankFor, rankLabel, rankMods, tierProgress,
-    CHAR_UNLOCK_SR, applyRankedResult, TOP5_QUALIFY, TOP5_MOCK, leaderboardWith,
+    CHAR_UNLOCK_SR, applyRankedResult, TOP5_QUALIFY, leaderboardWith, sha256,
+    ACCOUNTS: { init: accInit, register, login, logout, current, setSave, maybeRecord, boardEntries },
     SEASON, defaultRankedSave, seasonEnd, migrateSave
   };
 });
