@@ -1,8 +1,13 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.20';
+  const BUILD = '2026.11.21';
   const UPDATE_LOG = [
+    { version: '2026.11.21', tag: 'GAME MODES', items: [
+      'CASUAL + RANKED (owner: "when you log in lets add 2 different game modes, casual where you just can fight any of the bosses you\'ve previously fought in ranked, and obviously ranked which is the version we have now"): LOGGED-IN pilots get a mode bar in the hub — RANKED is the SR ladder exactly as before; CASUAL lists every boss you have met in ranked and lets you refight ANY of them at the pacing of the rank whose pool owns that boss (pools are exclusive, so that IS the difficulty you fought it at). Casual is SR-NEUTRAL: no delta, no W/L, no runs counter — pure practice, and QUEUE AGAIN refights the same boss',
+      'THE CASUAL ROSTER IS AN HONEST RANKED HISTORY: every ranked fight records which boss it was (SAVE.fought — casual fights do NOT unlock refights, the roster is earned in the ladder); unfought bosses read ??? until you meet them ranked. Guests play ranked-only — register to unlock casual',
+      'UPDATE LOG, CAPPED (owner: "fix the update log it just goes down and down and down into infinity"): the hub renders the CURRENT build\'s entry plus a SHOW OLDER PATCHES toggle — the page stops growing with every build; the full history stays one click away, nothing deleted'
+    ] },
     { version: '2026.11.20', tag: 'PLAYER ACCOUNTS', items: [
       'REAL ACCOUNTS (owner ask: "lets add actual accounts ... make a account verification system/login" + "make sure I keep my progress cuz I\'m at plat 2"): REGISTER in the hub header with a callsign and passcode — the passcode is stored ONLY as a salted SHA-256 digest (salted per account, fixed-time compare), never as text. The Pit is a static site on GitHub Pages, so accounts live per-browser; the hub shows who is banked (PILOT: NAME / LOG OUT) and guests keep playing as GUEST',
       'MIGRATION LAW — NOTHING STRANDS YOUR PROGRESS: registering claims this browser\'s existing guest save VERBATIM (SR, rank, cosmetics, W/L — the whole slot), shows what it claimed ("CLAIMED — PLATINUM 2 · 1450 SR"), and marks the guest slot claimed so a second account starts fresh instead of inheriting a copy. Logging out drops you to the untouched guest slot; logging back in rehydrates the account slot. Slots are isolated — no bleed either way',
@@ -138,6 +143,7 @@
 
   function renderHub() {
     renderPilotBar();
+    renderModeBar();
     // rank card — who you are on the ladder right now
     const prog = PIT.tierProgress(SAVE.sr);
     const rk = prog.rank;
@@ -230,10 +236,25 @@
 
     $('#opt-crt').checked = SAVE.crt;
     $('#opt-sfx').checked = SAVE.sfx;
+    // UPDATE LOG, CAPPED (owner: "it just goes down and down and down into infinity"):
+    // the hub shows the CURRENT build's entry; older builds collapse behind a toggle.
+    // The page stops growing with every build — full history is one click away.
+    // uplogAll lives at module scope: a re-render must never reset the pilot's choice.
+    const uplogBtn = () => {
+      const t = el('button', 'btn ghost uplog-toggle', uplogAll ? 'HIDE OLDER PATCHES' : `SHOW OLDER PATCHES (${UPDATE_LOG.length - 1})`);
+      t.onclick = () => { PIT_SFX.sfx('click'); uplogAll = !uplogAll; renderHub(); };
+      return t;
+    };
     const ul = $('#update-log-list'); ul.innerHTML = '';
-    UPDATE_LOG.forEach(u => {
+    UPDATE_LOG.forEach((u, ui) => {
+      if (ui > 0 && !uplogAll) return;
       ul.appendChild(el('li', '', `<b>${u.version} — ${u.tag}</b><ul>${u.items.map(i => `<li>${i}</li>`).join('')}</ul>`));
     });
+    if (UPDATE_LOG.length > 1) {
+      const li = el('li', 'uplog-toggle-row');
+      li.appendChild(uplogBtn());
+      ul.appendChild(li);
+    }
   }
 
   // options
@@ -263,8 +284,19 @@
     startFight(bossIndex, rk);
   }
 
-  function startFight(bossIndex, rk) {
+  // CASUAL mode (owner: "casual where you just can fight any of the bosses you've
+  // previously fought in ranked"): refight at the pacing of the rank whose pool owns
+  // the boss — that IS the difficulty you met it at. SR-neutral end to end.
+  function startCasual(bossIndex) {
+    startFight(bossIndex, PIT.poolRankOf(bossIndex), { casual: true });
+  }
+
+  let fightCasual = false, fightBossIndex = -1;
+  function startFight(bossIndex, rk, opts) {
+    const casual = !!(opts && opts.casual);
     rk = rk || PIT.rankFor(SAVE.sr);
+    fightCasual = casual;
+    fightBossIndex = bossIndex;
     // ROUND VARIETY: the rank name tells the engine to roll the mutator deck with the
     // fight seed — every attempt fights its own boss AND its own house twists
     st = PIT.createRun({ boss: bossIndex, charId: SAVE.char, seed: (Date.now() & 0xffffff) >>> 0, mods: PIT.rankMods(rk), rankName: rk.name });
@@ -273,7 +305,9 @@
     $('#result').hidden = true;
     $('#pause-ov').hidden = true;
     $('#ready-ov').hidden = true;
-    SAVE.runs++; persist();
+    // ranked fights bank stats AND the casual roster history; casual fights bank nothing
+    if (!casual) { SAVE.runs++; PIT.markFought(SAVE, bossIndex); }
+    persist();
     show('fight');
     const mutTag = st.mutators.length ? ' — ' + st.mutators.map(m => m.name).join(' · ') : '';
     $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${PIT.fmtMul(st.mods.hpMult)} TEMPO ×${PIT.fmtMul(1 / st.mods.gapMult)}${mutTag}`;
@@ -284,6 +318,53 @@
 
   // ROUND ANNOUNCER: populate the pre-round overlay with the boss and its mutators
   // (names + blurbs, so the player reads what each twist does before the gates open).
+  // ================= GAME MODES (ranked / casual) =================
+  // Owner: "when you log in lets add 2 different game modes, casual where you just
+  // can fight any of the bosses you've previously fought in ranked, and obviously
+  // ranked which is the version we have now basically". The mode bar shows only for
+  // logged-in pilots; guests keep the ranked queue as always.
+  let hubMode = 'ranked';
+  let uplogAll = false; // update-log expansion state survives re-renders
+  function renderModeBar() {
+    const bar = $('#mode-bar'); if (!bar) return;
+    const cr = $('#casual-roster');
+    if (!PIT.ACCOUNTS.current()) {
+      hubMode = 'ranked';
+      bar.hidden = true;
+      if (cr) { cr.hidden = true; cr.innerHTML = ''; }
+      $('#btn-play').textContent = 'ENTER THE PIT';
+      return;
+    }
+    bar.hidden = false;
+    bar.innerHTML = `
+      <button id="mode-ranked" class="btn ${hubMode === 'ranked' ? 'gold' : 'ghost'}">RANKED QUEUE</button>
+      <button id="mode-casual" class="btn ${hubMode === 'casual' ? 'gold' : 'ghost'}">CASUAL — REFIGHT</button>
+      <span class="mode-note">${hubMode === 'casual' ? 'PRACTICE — pick any boss you\'ve fought in ranked; no SR at stake' : 'THE LADDER — SR on the line; bosses roll from your rank\'s pool'}</span>`;
+    $('#mode-ranked').onclick = () => { hubMode = 'ranked'; PIT_SFX.sfx('click'); renderHub(); };
+    $('#mode-casual').onclick = () => { hubMode = 'casual'; PIT_SFX.sfx('click'); renderHub(); };
+    $('#btn-play').textContent = hubMode === 'casual' ? 'PICK A BOSS FROM THE CASUAL ROSTER' : 'ENTER THE PIT';
+    $('#btn-play').onclick = () => {
+      PIT_SFX.sfx('click');
+      if (hubMode === 'casual') { cr.scrollIntoView({ behavior: 'smooth' }); return; }
+      startRanked();
+    };
+    if (!cr) return;
+    if (hubMode !== 'casual') { cr.hidden = true; cr.innerHTML = ''; return; }
+    cr.hidden = false;
+    cr.innerHTML = '';
+    const foughtCount = Object.keys(SAVE.fought || {}).length;
+    cr.appendChild(el('h2', 'sect', `CASUAL — YOUR RANKED HISTORY (${foughtCount}/${PIT.BOSSES.LIST.length} BOSSES MET)`));
+    const grid = el('div', 'casual-grid'); cr.appendChild(grid);
+    PIT.casualRoster(SAVE).forEach(b => {
+      const card = el('button', 'casual-card' + (b.fought ? '' : ' locked'));
+      card.innerHTML = b.fought
+        ? `<div class="cc-name">${b.name}</div><div class="cc-role">${b.rankName} PACING</div><div class="cc-ab">REFIGHT — PRACTICE, NO SR</div>`
+        : `<div class="cc-name">???</div><div class="cc-role">LOCKED — ${b.rankName}</div><div class="cc-ab">FIGHT IT IN RANKED FIRST</div>`;
+      if (b.fought) card.onclick = () => { PIT_SFX.sfx('click'); startCasual(b.index); };
+      grid.appendChild(card);
+    });
+  }
+
   // ================= PLAYER ACCOUNTS (register / login / logout) =================
   // Per-browser accounts: the passcode never leaves this browser and is stored only
   // as a salted SHA-256 digest. Registering claims the browser's unclaimed guest
@@ -385,7 +466,10 @@
     running = false;
     const win = st.over === 'win';
     const heartsLost = st.player.maxHearts - Math.max(0, st.player.hearts);
-    const res = PIT.applyRankedResult(SAVE, win, heartsLost, st.mods.srMult || 1);
+    // CASUAL is SR-neutral by law: no delta, no W/L, no unlocks — practice only
+    const res = fightCasual
+      ? { delta: 0, promoted: null, demoted: null, newChars: [], casual: true }
+      : PIT.applyRankedResult(SAVE, win, heartsLost, st.mods.srMult || 1);
     persist();
     showResult(win, res, heartsLost);
   }
@@ -396,13 +480,21 @@
     box.innerHTML = '';
     box.appendChild(el('h2', win ? 'gold' : 'crimson', win ? 'BOSS DOWN' : 'FLATLINED'));
     const after = PIT.rankFor(SAVE.sr);
-    const deltaCls = res.delta >= 0 ? 'gold' : 'crimson';
-    box.appendChild(el('div', 'sr-delta ' + deltaCls, (res.delta >= 0 ? '+' : '') + res.delta + ' SR'));
+    if (res.casual) {
+      box.appendChild(el('div', 'sr-delta gold', 'PRACTICE — NO SR AT STAKE'));
+    } else {
+      const deltaCls = res.delta >= 0 ? 'gold' : 'crimson';
+      box.appendChild(el('div', 'sr-delta ' + deltaCls, (res.delta >= 0 ? '+' : '') + res.delta + ' SR'));
+    }
     if (win) {
       const label = heartsLost === 0 ? 'CLEAN WIN — full HP' : `${heartsLost} heart${heartsLost === 1 ? '' : 's'} lost`;
-      box.appendChild(el('p', 'result-sub', `${label} · boss HP was ${Math.round(100 * st.boss.hp / st.boss.maxHp)}% of a ${st.bossDef.name} at ${PIT.rankLabel(PIT.rankFor(SAVE.sr))} pacing`));
+      box.appendChild(el('p', 'result-sub', res.casual
+        ? `${label} · practice refight of a ${st.bossDef.name} at ${PIT.rankLabel(PIT.poolRankOf(fightBossIndex))} pacing`
+        : `${label} · boss HP was ${Math.round(100 * st.boss.hp / st.boss.maxHp)}% of a ${st.bossDef.name} at ${PIT.rankLabel(PIT.rankFor(SAVE.sr))} pacing`));
     } else {
-      box.appendChild(el('p', 'result-sub', `The Tide keeps the SR. Boss HP was ${Math.max(0, Math.round(100 * st.boss.hp / st.boss.maxHp))}% left.`));
+      box.appendChild(el('p', 'result-sub', res.casual
+        ? `Practice flatline — nothing lost, nothing gained. Boss HP was ${Math.max(0, Math.round(100 * st.boss.hp / st.boss.maxHp))}% left.`
+        : `The Tide keeps the SR. Boss HP was ${Math.max(0, Math.round(100 * st.boss.hp / st.boss.maxHp))}% left.`));
     }
     if (st.mutators.length) {
       box.appendChild(el('p', 'result-sub', 'MUTATORS: ' + st.mutators.map(m => m.name).join(' · ')));
@@ -416,7 +508,7 @@
     if (seasonBanner) { box.appendChild(el('div', 'banner gold', `SEASON ${seasonBanner.from} ENDED — REWARD: ${seasonBanner.badge}`)); seasonBanner = null; }
     box.appendChild(el('p', 'result-sub', `Now ${PIT.rankLabel(after)} · ${SAVE.sr} SR`));
     const row = el('div', 'result-btns');
-    const again = el('button', 'btn', 'QUEUE AGAIN'); again.onclick = () => { PIT_SFX.sfx('click'); box.hidden = true; startRanked(); };
+    const again = el('button', 'btn', 'QUEUE AGAIN'); again.onclick = () => { PIT_SFX.sfx('click'); box.hidden = true; if (fightCasual) startCasual(fightBossIndex); else startRanked(); };
     row.appendChild(again);
     const hub = el('button', 'btn ghost', 'HUB'); hub.onclick = () => { PIT_SFX.sfx('click'); box.hidden = true; show('hub'); };
     row.appendChild(hub);

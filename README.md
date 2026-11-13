@@ -26,6 +26,14 @@ Stars are gone. Every queue rolls a random boss from your rank's pool — and **
 
 REGISTER in the hub header with a callsign (3-16 chars) and a passcode (6+). The passcode never leaves your browser and is stored only as a **salted SHA-256 digest** — salted per account, fixed-time compare, never plaintext. The Pit is a static site on GitHub Pages, so accounts are **per-browser**: register on a device and your progress banks under that callsign there; log in on the same browser to rehydrate it. Registering **claims this browser's existing guest save verbatim** — SR, rank, cosmetics, record — so nothing strands (the owner's plat 2 survived the migration untouched, by test). The guest slot stays behind as a backup; a second account starts fresh instead of inheriting a copy; logout drops you to the guest slot and login brings the account slot back. Slots are isolated by tests.
 
+## Game modes (ranked / casual)
+
+Logged-in pilots get a **mode bar** in the hub. **RANKED** is the ladder exactly as always — SR on the line, bosses roll from your rank's pool. **CASUAL** is practice: pick any boss you've already met in ranked and refight it at the pacing of the rank whose pool owns that boss (pools are exclusive, so that IS the difficulty you fought it at). Casual is **SR-neutral** — no delta, no W/L, no runs counter — and QUEUE AGAIN refights the same boss. The casual roster is an honest ranked history: every ranked fight records which boss it was; casual fights never unlock refights, and unfought bosses read ??? until you meet them in the ladder. Guests play ranked-only — register to unlock casual.
+
+## The update log is capped
+
+The hub renders the **current build's entry** and collapses older builds behind a `SHOW OLDER PATCHES` toggle — the page no longer grows forever with every build, and nothing is deleted (the full history stays one click away).
+
 ## Every round rolls a twist — ROUND VARIETY mutators
 
 Repetition is a design bug, so every queue can draw **mutators** — house twists the Pit rolls with the boss, seeded per attempt (one attempt always fights the same twist, no two queues play the same fight). The fight title and the results screen tell you exactly what was drawn. **TEMPO** is the pacing stat: how much sooner the boss cycles its patterns — ×1.25 means attacks come a quarter sooner, ×0.9 means it pauses a little longer. Higher TEMPO is always faster; the old "GAP" tag said the same thing backwards, which is exactly why it was renamed (owner report: "idk what GAP is"):
@@ -119,6 +127,6 @@ Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, 
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.20 // PLAYER ACCOUNTS** (bust `20261110p`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.21 // GAME MODES** (bust `20261110q`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

@@ -1216,6 +1216,29 @@ console.log('--- Player accounts: real login, honest board, nothing strands ---'
     (() => { const c = PIT.ACCOUNTS.current(); return c.save === null; })());
 }
 
+// ================= GAME MODES (owner Task 47 follow-up) =================
+console.log('--- Game modes: casual refights of a ranked history ---');
+{
+  const save = PIT.defaultRankedSave();
+  check('save v2 carries a fought map (old saves merge it in via defaults)', save.fought && Object.keys(save.fought).length === 0 && save.v === 2);
+  const legacy = { v: 2, sr: 500 }; // a save from before the field existed
+  PIT.markFought(legacy, 7);
+  check('markFought backfills a missing fought map (no legacy save breaks)', legacy.fought && legacy.fought[7] === 1);
+  PIT.markFought(save, 3);
+  PIT.markFought(save, 3);
+  PIT.markFought(save, 19);
+  check('markFought counts per boss index', save.fought[3] === 2 && save.fought[19] === 1);
+  const bronze = PIT.poolRankOf(0), plat = PIT.poolRankOf(19);
+  check('poolRankOf maps a boss to the rank whose pool owns it (pools are exclusive)',
+    bronze.name === 'BRONZE' && plat.name === 'PLATINUM' && PIT.RANKS.filter(r => r.pool.includes(0)).every(r => r.name === 'BRONZE'));
+  const roster = PIT.casualRoster(save);
+  check('casualRoster covers the whole roster in LIST order, ??? for unmet bosses',
+    roster.length === PIT.BOSSES.LIST.length && roster.every((b, i) => b.index === i) &&
+    roster[3].fought && roster[3].name === PIT.BOSSES.LIST[3].name && roster[0].name === '???' && !roster[0].fought);
+  check('casualRoster carries the pacing label (the rank whose pool owns the boss)',
+    roster[3].rankName === 'BRONZE' && roster[19].rankName === 'PLATINUM');
+}
+
 console.log('--- House guards ---');
 {
   const fs = require('fs');
@@ -1223,9 +1246,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.20', APP.includes("const BUILD = '2026.11.20'"));
-  check('app.js update log leads with PLAYER ACCOUNTS', APP.includes("tag: 'PLAYER ACCOUNTS'") && APP.indexOf("tag: 'PLAYER ACCOUNTS'") < APP.indexOf("tag: 'PLAIN TEMPO'"));
-  check('app.js update log keeps the PLAIN TEMPO entry', APP.includes("tag: 'PLAIN TEMPO'") && APP.indexOf("tag: 'PLAIN TEMPO'") < APP.indexOf("tag: 'SIGNATURE WAVE'"));
+  check('app.js pins BUILD 2026.11.21', APP.includes("const BUILD = '2026.11.21'"));
+  check('app.js update log leads with GAME MODES', APP.includes("tag: 'GAME MODES'") && APP.indexOf("tag: 'GAME MODES'") < APP.indexOf("tag: 'PLAYER ACCOUNTS'"));
+  check('app.js update log keeps the PLAYER ACCOUNTS entry', APP.includes("tag: 'PLAYER ACCOUNTS'") && APP.indexOf("tag: 'PLAYER ACCOUNTS'") < APP.indexOf("tag: 'PLAIN TEMPO'"));
   check('app.js logs the ROUND ANNOUNCER entry', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
   check('app.js logs the ROUND VARIETY entry', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
   check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
@@ -1239,9 +1262,23 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.20 // PLAYER ACCOUNTS', IDX.includes('BUILD 2026.11.20 // CORE BREACH: PIT — PLAYER ACCOUNTS'));
+  check('index.html footer stamps BUILD 2026.11.21 // GAME MODES', IDX.includes('BUILD 2026.11.21 // CORE BREACH: PIT — GAME MODES'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110p', busts.length === 7 && busts.every(t => t === '?v=20261110p'), busts.join(','));
+  check('all 7 asset tags bust at 20261110q', busts.length === 7 && busts.every(t => t === '?v=20261110q'), busts.join(','));
+  check('GAME MODES UI: mode bar + casual roster markup + how-to exist',
+    IDX.includes('id="mode-bar"') && IDX.includes('id="casual-roster"') && IDX.includes('<b>Game modes:</b>'));
+  check('GAME MODES wiring: casual refights at pool pacing, SR-neutral results, QUEUE AGAIN stays in mode',
+    APP.includes('function startCasual') && APP.includes('startFight(bossIndex, PIT.poolRankOf(bossIndex), { casual: true })') &&
+    APP.includes('if (!casual) { SAVE.runs++; PIT.markFought(SAVE, bossIndex); }') &&
+    APP.includes('PRACTICE — NO SR AT STAKE') && APP.includes('if (fightCasual) startCasual(fightBossIndex); else startRanked();'));
+  check('GAME MODES gate: mode bar renders only for logged-in pilots, guests stay ranked-only',
+    APP.includes('if (!PIT.ACCOUNTS.current()) {') && APP.includes("hubMode = 'ranked';") &&
+    APP.includes("hubMode === 'casual' ? 'PICK A BOSS FROM THE CASUAL ROSTER' : 'ENTER THE PIT'"));
+  check('fought is recorded ONLY from ranked queues (casual never unlocks refights)',
+    APP.includes('PIT.markFought(SAVE, bossIndex); }') && !APP.includes('if (casual) { SAVE.runs++'));
+  check('update log is capped: older builds collapse behind a toggle, nothing deleted',
+    APP.includes('SHOW OLDER PATCHES') && APP.includes('HIDE OLDER PATCHES') && APP.includes('if (ui > 0 && !uplogAll) return;'));
+  check('engine exports the game-mode helpers', ENG.includes('markFought, poolRankOf, casualRoster'));
   check('PLAYER ACCOUNTS UI: auth overlay + pilot bar markup exist',
     IDX.includes('id="auth-ov"') && IDX.includes('id="auth-name"') && IDX.includes('id="auth-pass"') &&
     IDX.includes('id="auth-go"') && IDX.includes('id="auth-switch"') && IDX.includes('id="auth-close"') &&

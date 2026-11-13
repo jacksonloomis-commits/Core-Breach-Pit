@@ -1063,7 +1063,27 @@
   // a cosmetic badge for that season's peak rank and opens the next one. SR carries.
   const SEASON = 1;
   function defaultRankedSave() {
-    return { v: 2, sr: 0, peakSr: 0, season: SEASON, seasonPeak: 0, cosmetics: [], chars: ['volt'], char: 'volt', crt: true, sfx: true, runs: 0, wins: 0, losses: 0 };
+    return { v: 2, sr: 0, peakSr: 0, season: SEASON, seasonPeak: 0, cosmetics: [], chars: ['volt'], char: 'volt', crt: true, sfx: true, runs: 0, wins: 0, losses: 0, fought: {} };
+  }
+
+  // ---------- GAME MODES (owner Task 47 follow-up) ----------
+  // CASUAL: logged-in pilots refight any boss they've met in ranked, at the pacing
+  // of the rank whose pool owns that boss (pools are exclusive, so that IS the
+  // difficulty they fought it at). Casual fights are SR-NEUTRAL — no delta, no W/L,
+  // no runs counter; pure practice. `fought` is recorded ONLY from ranked queues,
+  // so the casual roster stays an honest ranked history.
+  function markFought(save, bossIndex) {
+    if (!save) return;
+    save.fought = save.fought || {};
+    save.fought[bossIndex] = (save.fought[bossIndex] || 0) + 1;
+  }
+  function poolRankOf(bossIndex) {
+    const i = typeof bossIndex === 'number' ? bossIndex : BOSSES.LIST.findIndex(b => b.id === bossIndex);
+    return RANKS.find(r => r.pool.includes(i)) || RANKS[RANKS.length - 1];
+  }
+  function casualRoster(save) {
+    const f = (save && save.fought) || {};
+    return BOSSES.LIST.map((b, i) => ({ index: i, id: b.id, name: f[i] ? b.name : '???', fought: !!f[i], rankName: poolRankOf(i).name }));
   }
   function seasonEnd(save) {
     const res = { badge: null, from: save.season };
@@ -1100,6 +1120,7 @@
     AGGRO, aggroAt, MUTATORS, rollMutators, fmtMul,
     SR, srDelta, RANKS, RANK_MODS, rankFor, rankLabel, rankMods, tierProgress,
     CHAR_UNLOCK_SR, applyRankedResult, TOP5_QUALIFY, leaderboardWith, sha256,
+    markFought, poolRankOf, casualRoster,
     ACCOUNTS: { init: accInit, register, login, logout, current, setSave, maybeRecord, boardEntries },
     SEASON, defaultRankedSave, seasonEnd, migrateSave
   };

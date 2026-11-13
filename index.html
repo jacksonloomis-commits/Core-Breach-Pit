@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CORE BREACH: PIT // Ranked Boss-Rush Arena</title>
-  <link rel="stylesheet" href="styles.css?v=20261110p">
+  <link rel="stylesheet" href="styles.css?v=20261110q">
 </head>
 <body>
   <div id="app">
@@ -19,6 +19,7 @@
       </header>
 
       <button id="btn-play" class="btn gold big">ENTER THE PIT</button>
+      <div id="mode-bar" class="mode-bar" hidden></div>
 
       <div class="rank-wrap">
         <div id="rank-card" class="rank-card"></div>
@@ -37,6 +38,8 @@
       <h2 class="sect">THE ROSTER</h2>
       <div id="roster" class="roster"></div>
 
+      <div id="casual-roster" class="casual-roster" hidden></div>
+
       <div class="hub-cols">
         <div class="hub-col">
           <h2 class="sect">HOW TO PLAY</h2>
@@ -49,6 +52,7 @@
             <p><b>Mutators:</b> every queue can roll house twists — FRAIL, SWIFT HORROR, SIEGE, HEATED AIR, BROOD BLIGHT, VOLATILE CORE, ADRENALINE, BOUNTY. <b>TEMPO</b> is the boss's pacing: ×1.25 cycles its attacks a quarter sooner, ×0.9 pauses a little longer — higher is always faster. Bronze mostly stays clean; the deep ranks stack two. Each round opens with a countdown that names the boss and every mutator with what it does — read it, then FIGHT. No two rounds play the same.</p>
             <p><b>Ranked:</b> each queue rolls a random boss from your rank's pool. Wins bank SR by the hearts you keep; flatlining costs SR. Higher ranks send the same lieutenants with more HP and tighter pacing — Silver walls you with the <b>DEATHWARRANT weight class</b>. GHOST unlocks at Silver (500 SR), BULWARK at Platinum (1100 SR).</p>
             <p><b>Accounts:</b> REGISTER in the hub header to bank your progress under a callsign — passcode stored only as a salted hash, in this browser (the Pit is a static site; there is no server). Registering claims this browser's existing progress automatically, so nothing is lost. The Top 5 board is honest: every slot reads <b>???</b> until a real registered pilot on this browser cracks 4000 SR — no fake names, ever.</p>
+            <p><b>Game modes:</b> logged-in pilots get a mode bar above the ladder. <b>RANKED</b> is the ladder exactly as always — SR on the line, bosses roll from your rank's pool. <b>CASUAL</b> is practice: pick any boss you've already met in ranked and refight it at that rank's pacing — no SR, no W/L, nothing changes. The casual roster is your ranked history: locked bosses read ??? until you fight them in the ladder first.</p>
           </div>
           <!-- auth overlay: hub-level, opens from the pilot bar -->
           <div id="auth-ov" class="result-ov auth-ov" hidden>
@@ -106,13 +110,13 @@
     </section>
   </div>
 
-  <footer id="build-foot">BUILD 2026.11.20 // CORE BREACH: PIT — PLAYER ACCOUNTS</footer>
+  <footer id="build-foot">BUILD 2026.11.21 // CORE BREACH: PIT — GAME MODES</footer>
 
-  <script src="palette.js?v=20261110p"></script>
-  <script src="chars.js?v=20261110p"></script>
-  <script src="bosses.js?v=20261110p"></script>
-  <script src="engine.js?v=20261110p"></script>
-  <script src="audio.js?v=20261110p"></script>
-  <script src="app.js?v=20261110p"></script>
+  <script src="palette.js?v=20261110q"></script>
+  <script src="chars.js?v=20261110q"></script>
+  <script src="bosses.js?v=20261110q"></script>
+  <script src="engine.js?v=20261110q"></script>
+  <script src="audio.js?v=20261110q"></script>
+  <script src="app.js?v=20261110q"></script>
 </body>
 </html>

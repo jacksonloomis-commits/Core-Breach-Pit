@@ -219,3 +219,17 @@ body.no-crt::after { display: none; }
 .auth-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .t5-row.empty .t5-name { color: var(--gray); opacity: 0.55; }
 .t5-row.empty .t5-sr { color: var(--gray); opacity: 0.4; }
+
+/* ================= GAME MODES (Task 47 follow-up) ================= */
+.mode-bar { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; flex-wrap: wrap; justify-content: center; }
+.mode-bar .mode-note { color: var(--gray); font-size: 11px; letter-spacing: 0.06em; }
+.casual-roster { margin-top: 6px; }
+.casual-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.casual-card { width: 150px; text-align: left; background: rgba(143, 31, 46, 0.12); border: 1px solid var(--crimlite, #8f1f2e); padding: 8px 10px; cursor: pointer; color: inherit; font: inherit; }
+.casual-card .cc-name { font-size: 12px; letter-spacing: 0.1em; }
+.casual-card .cc-role { color: var(--gray); font-size: 10px; margin-top: 2px; }
+.casual-card .cc-ab { color: var(--gold, #d9a441); font-size: 10px; margin-top: 4px; }
+.casual-card.locked { opacity: 0.5; cursor: default; }
+.casual-card.locked .cc-name { color: var(--gray); }
+.uplog-toggle-row { list-style: none; margin-top: 6px; }
+.uplog-toggle-row .btn { font-size: 10px; padding: 4px 10px; }
