@@ -10,28 +10,28 @@ Static browser game: HTML/CSS/JS, no build step, no backend, no accounts, no net
 
 Stars are gone. Every queue rolls a random boss from your rank's pool — and **each arena owns its pool exclusively**: no boss rolls in two arenas, and every arena rolls a **FULL BENCH of five to seven** bodies (pinned by tests). Wins bank SR by the hearts you keep (full HP +30 · one heart +15 · two −5 · three or more −20 · flatline −10). SR never resets — seasons only award cosmetic badges on top.
 
-| Rank | SR | Mods (HP × / GAP ×) | Boss pool (exclusive to this arena) |
+| Rank | SR | Mods (HP × / TEMPO ×) | Boss pool (exclusive to this arena) |
 | --- | --- | --- | --- |
 | BRONZE 1–3 | 0–500 | 1.0 / 1.0 | GATEKEEPER · BILESPITTER · GNASHER · CINDERMITE · THRESHER · MOSSBACK |
 | SILVER 1–3 | 500–800 | 1.05 / 1.0 | **the DEATHWARRANT area** — THE SURGEON · HIVE MOTHER · DEATHWARRANT · PALE HERALD · GLOAMWARDEN · CARRION LAW · THE BALLAST |
-| GOLD 1–2 | 800–1100 | 1.2 / 0.9 | the tax collectors — BRASS HERALD · THE AUDITOR · TOLLMASTER · THE LEDGER · THE MINTER · THE EXCHEQUER |
-| PLATINUM 1–3 | 1100–2000 | 1.5 / 0.85 | GRAVEWAKE · CINDERMAW · HOLLOW REGENT · IRON CHOIR · THE PUPPETEER · LANTERN MAW |
-| DIAMOND 1–3 | 2000–2500 | 1.7 / 0.8 | THE LOOM · DREDGEWARDEN · THE FATHOM · THE UNDERTOW · PRESSURE SAINT |
-| CRIMSON 1–3 | 2500–3500 | 1.85 / 0.75 | MAELSTROM · GORE PRELATE · NULL SOVEREIGN · THE MARSHAL · THE GORGET · VESPER |
-| IRIDESCENT | 3500+ | 2.0 / 0.7 | THE GLUTTON · PALE LEVIATHAN · OLD WATER · THE ABYSSAL ARCHIVE · THE LAST SHORE · TIDE UNBOUND |
+| GOLD 1–2 | 800–1100 | 1.2 / 1.11 | the tax collectors — BRASS HERALD · THE AUDITOR · TOLLMASTER · THE LEDGER · THE MINTER · THE EXCHEQUER |
+| PLATINUM 1–3 | 1100–2000 | 1.5 / 1.18 | GRAVEWAKE · CINDERMAW · HOLLOW REGENT · IRON CHOIR · THE PUPPETEER · LANTERN MAW |
+| DIAMOND 1–3 | 2000–2500 | 1.7 / 1.25 | THE LOOM · DREDGEWARDEN · THE FATHOM · THE UNDERTOW · PRESSURE SAINT |
+| CRIMSON 1–3 | 2500–3500 | 1.85 / 1.33 | MAELSTROM · GORE PRELATE · NULL SOVEREIGN · THE MARSHAL · THE GORGET · VESPER |
+| IRIDESCENT | 3500+ | 2.0 / 1.43 | THE GLUTTON · PALE LEVIATHAN · OLD WATER · THE ABYSSAL ARCHIVE · THE LAST SHORE · TIDE UNBOUND |
 
 Top 5 board: crack the board by SR (qualifying 4000). Season 1 is live.
 
 ## Every round rolls a twist — ROUND VARIETY mutators
 
-Repetition is a design bug, so every queue can draw **mutators** — house twists the Pit rolls with the boss, seeded per attempt (one attempt always fights the same twist, no two queues play the same fight). The fight title and the results screen tell you exactly what was drawn:
+Repetition is a design bug, so every queue can draw **mutators** — house twists the Pit rolls with the boss, seeded per attempt (one attempt always fights the same twist, no two queues play the same fight). The fight title and the results screen tell you exactly what was drawn. **TEMPO** is the pacing stat: how much sooner the boss cycles its patterns — ×1.25 means attacks come a quarter sooner, ×0.9 means it pauses a little longer. Higher TEMPO is always faster; the old "GAP" tag said the same thing backwards, which is exactly why it was renamed (owner report: "idk what GAP is"):
 
 | Mutator | Effect |
 | --- | --- |
 | FRAIL | boss HP ×0.72 — brittle lieutenant |
-| SWIFT HORROR | boss GAP ×0.85, HP ×0.92 — faster patterns, thinner shell |
-| SIEGE | boss HP ×1.25, GAP ×1.12 — a wall that takes its time |
-| HEATED AIR | projectile SPEED ×1.10, GAP ×1.08 — hotter bullets, not hotter telegraphs |
+| SWIFT HORROR | boss TEMPO ×1.176, HP ×0.92 — attacks come ~18% sooner, thinner shell |
+| SIEGE | boss HP ×1.25, TEMPO ×0.893 — a wall that takes its time |
+| HEATED AIR | projectile SPEED ×1.10, TEMPO ×0.926 — hotter bullets, a hair more breathing room |
 | BROOD BLIGHT | minion HP ×0.6 — the brood hatches sickly (spawner arenas only) |
 | VOLATILE CORE | the fury curve sits one phase deeper from the first phase |
 | ADRENALINE | you run ×1.12 faster (dash untouched) |
@@ -115,6 +115,6 @@ Saves: `cbp-save-v2` in localStorage. Old `cbp-save-v1` progress is **migrated, 
 
 ## Versioning
 
-Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.18 // SIGNATURE WAVE** (bust `20261110n`).
+Every shipped change stamps `BUILD` + an `UPDATE_LOG` entry in `app.js`, a `BUILD <ver> // <TAG>` footer in `index.html`, and bumps the `?v=` cache-bust on all asset tags — in the same commit. Current build: **2026.11.19 // PLAIN TEMPO** (bust `20261110o`).
 
 See `AGENTS.md` for the development rules. Licensed under the PolyForm Noncommercial License (see `LICENSE` / `NOTICE`).

@@ -1128,9 +1128,9 @@ console.log('--- House guards ---');
   const IDX = fs.readFileSync(__dirname + '/../index.html', 'utf8');
   const CSS = fs.readFileSync(__dirname + '/../styles.css', 'utf8');
   const ENG = fs.readFileSync(__dirname + '/../engine.js', 'utf8');
-  check('app.js pins BUILD 2026.11.18', APP.includes("const BUILD = '2026.11.18'"));
-  check('app.js update log leads with SIGNATURE WAVE', APP.includes("tag: 'SIGNATURE WAVE'") && APP.indexOf("tag: 'SIGNATURE WAVE'") < APP.indexOf("tag: 'FULL BENCH'"));
-  check('app.js update log keeps the FULL BENCH entry', APP.includes("tag: 'FULL BENCH'") && APP.indexOf("tag: 'FULL BENCH'") < APP.indexOf("tag: 'HONEST DASH'"));
+  check('app.js pins BUILD 2026.11.19', APP.includes("const BUILD = '2026.11.19'"));
+  check('app.js update log leads with PLAIN TEMPO', APP.includes("tag: 'PLAIN TEMPO'") && APP.indexOf("tag: 'PLAIN TEMPO'") < APP.indexOf("tag: 'SIGNATURE WAVE'"));
+  check('app.js update log keeps the SIGNATURE WAVE entry', APP.includes("tag: 'SIGNATURE WAVE'") && APP.indexOf("tag: 'SIGNATURE WAVE'") < APP.indexOf("tag: 'FULL BENCH'"));
   check('app.js logs the ROUND ANNOUNCER entry', APP.includes("tag: 'ROUND ANNOUNCER'") && APP.indexOf("tag: 'ROUND ANNOUNCER'") < APP.indexOf("tag: 'ROUND VARIETY'"));
   check('app.js logs the ROUND VARIETY entry', APP.includes("tag: 'ROUND VARIETY'") && APP.indexOf("tag: 'ROUND VARIETY'") < APP.indexOf("tag: 'BROOD TAX'"));
   check('app.js logs the BROOD TAX entry', APP.includes("tag: 'BROOD TAX'"));
@@ -1144,9 +1144,9 @@ console.log('--- House guards ---');
   check('app.js logs the overlay hotfix', APP.includes('HOTFIX: PAUSED/RESULTS overlays'));
   check('app.js logs the dash-i-frame regression fix', APP.includes('dash invincibility never expired'));
   check('app.js logs the PHASE ability fix', APP.includes('PHASE was a coat of paint'));
-  check('index.html footer stamps BUILD 2026.11.18 // SIGNATURE WAVE', IDX.includes('BUILD 2026.11.18 // CORE BREACH: PIT — SIGNATURE WAVE'));
+  check('index.html footer stamps BUILD 2026.11.19 // PLAIN TEMPO', IDX.includes('BUILD 2026.11.19 // CORE BREACH: PIT — PLAIN TEMPO'));
   const busts = IDX.match(/\?v=[0-9a-z]+/g) || [];
-  check('all 7 asset tags bust at 20261110n', busts.length === 7 && busts.every(t => t === '?v=20261110n'), busts.join(','));
+  check('all 7 asset tags bust at 20261110o', busts.length === 7 && busts.every(t => t === '?v=20261110o'), busts.join(','));
   check('SIGNATURE WAVE UI: the announcer names the signature and the roster lists it',
     APP.includes("$('#ready-sig')") && APP.includes('SIGNATURE — ') && APP.includes('class="rb-sig"'));
   check('SIGNATURE WAVE markup + styles: ready-sig element, .rsig card, roster sig tag, howto',
@@ -1173,9 +1173,16 @@ console.log('--- House guards ---');
   check('app.js renders the mutator draw in the fight title and results',
     APP.includes('rankName: rk.name') && APP.includes("'MUTATORS: '"));
   check('multipliers reach the UI only through fmtMul (no raw float interpolation in the title/ladder)',
-    APP.includes('PIT.fmtMul(st.mods.hpMult)') && APP.includes('PIT.fmtMul(st.mods.gapMult)') &&
-    APP.includes('PIT.fmtMul(mods.hpMult)') && APP.includes('PIT.fmtMul(mods.gapMult)') &&
+    APP.includes('PIT.fmtMul(st.mods.hpMult)') && APP.includes('PIT.fmtMul(1 / st.mods.gapMult)') &&
+    APP.includes('PIT.fmtMul(mods.hpMult)') && APP.includes('PIT.fmtMul(1 / mods.gapMult)') &&
     !APP.includes('HP ×${st.mods.hpMult}'));
+  check('PLAIN TEMPO: no player-facing "GAP ×" remains (owner report: "idk what GAP is")',
+    !APP.includes('GAP ×') && !IDX.includes('GAP ×') &&
+    ENG.includes('TEMPO ×1.176') && ENG.includes('TEMPO ×0.893') && ENG.includes('TEMPO ×0.926'));
+  check('PLAIN TEMPO: the display inverts the gap honestly (fmtMul(1/0.85)="1.176", fmtMul(1/1.12)="0.893", fmtMul(1/1.08)="0.926")',
+    PIT.fmtMul(1 / 0.85) === '1.176' && PIT.fmtMul(1 / 1.12) === '0.893' && PIT.fmtMul(1 / 1.08) === '0.926');
+  check('PLAIN TEMPO: the how-to teaches the stat (higher is always faster)',
+    IDX.includes('<b>TEMPO</b> is the boss\'s pacing') && IDX.includes('higher is always faster'));
   check('ROUND ANNOUNCER: pre-round countdown from 5 with boss name and mutator blurbs',
     APP.includes('const READY_SECS = 5') && APP.includes("$('#ready-ov')") && APP.includes("$('#ready-num')") &&
     APP.includes('showReady(rk)') && APP.includes('m.blurb') && APP.includes("PIT_SFX.sfx('count')") &&

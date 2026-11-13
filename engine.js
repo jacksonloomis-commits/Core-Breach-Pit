@@ -731,9 +731,13 @@
   // patterns. MUTATORS NEVER TOUCH SPAWN COUNTS OR CAPS (summon-cadence law).
   const MUTATORS = [
     { id: 'frail', name: 'FRAIL', blurb: 'Brittle lieutenant — boss HP ×0.72.', hp: 0.72 },
-    { id: 'swift', name: 'SWIFT HORROR', blurb: 'It cycles patterns faster, but its shell thins — GAP ×0.85, HP ×0.92.', gap: 0.85, hp: 0.92 },
-    { id: 'siege', name: 'SIEGE', blurb: 'A wall of HP, but it takes its time — HP ×1.25, GAP ×1.12.', hp: 1.25, gap: 1.12 },
-    { id: 'heated', name: 'HEATED AIR', blurb: 'Every projectile flies hotter — SPEED ×1.10, GAP ×1.08.', proj: 1.10, gap: 1.08 },
+    // TEMPO is the player-facing pacing stat: 1/gap — how much sooner the boss cycles
+    // its patterns. Higher is always more dangerous (TEMPO ×1.176 = attacks come ~18%
+    // sooner; ×0.893 = it pauses a little longer). Never show bare "GAP" — owner report:
+    // "it keeps saying GAP in the mutations but idk what GAP is".
+    { id: 'swift', name: 'SWIFT HORROR', blurb: 'It cycles patterns faster, but its shell thins — TEMPO ×1.176, HP ×0.92.', gap: 0.85, hp: 0.92 },
+    { id: 'siege', name: 'SIEGE', blurb: 'A wall of HP, but it takes its time — HP ×1.25, TEMPO ×0.893.', hp: 1.25, gap: 1.12 },
+    { id: 'heated', name: 'HEATED AIR', blurb: 'Every projectile flies hotter — SPEED ×1.10, TEMPO ×0.926.', proj: 1.10, gap: 1.08 },
     { id: 'blight', name: 'BROOD BLIGHT', blurb: 'The brood hatches sickly — minion HP ×0.6. Spawner arenas only.', minionHp: 0.6, needsSpawn: true },
     { id: 'volatile', name: 'VOLATILE CORE', blurb: 'It runs hot from the first phase — the fury curve sits one phase deeper.', aggroShift: 1 },
     { id: 'adrenaline', name: 'ADRENALINE', blurb: 'Adrenal spike — you run ×1.12 faster.', speed: 1.12 },

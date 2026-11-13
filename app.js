@@ -1,8 +1,13 @@
 // CORE BREACH: PIT — browser UI, game loop, renderer, hub, saves.
 (function () {
   'use strict';
-  const BUILD = '2026.11.18';
+  const BUILD = '2026.11.19';
   const UPDATE_LOG = [
+    { version: '2026.11.19', tag: 'PLAIN TEMPO', items: [
+      'THE PACING TAG IS RENAMED (owner report: "it keeps saying GAP in the mutations but idk what GAP is"): every pacing multiplier now reads TEMPO — how much sooner the boss cycles its patterns. Higher is always more dangerous: TEMPO ×1.25 = attacks come a quarter sooner, ×0.9 = it pauses a little longer. No more guessing which way the number cuts',
+      'SAME NUMBERS, HONEST DIRECTION: SWIFT HORROR is now TEMPO ×1.176 (the old tag said 0.85 — lower meant faster, which is exactly why it read backwards), SIEGE is TEMPO ×0.893, HEATED AIR is TEMPO ×0.926. The fight title and the ladder show the composed TEMPO, rounded clean through fmtMul like every other multiplier',
+      'THE HOW-TO-PLAY SECTION TEACHES THE STAT in one line, and the mutator blurbs say it in words first — the stat is for reading the draw fast, not for decoding jargon'
+    ] },
     { version: '2026.11.18', tag: 'SIGNATURE WAVE', items: [
       'EVERY BOSS HAS A SIGNATURE NOW (owner spec: "a lot of these bosses have the same gimmick ... every boss should feel a little unique"): all 42 lieutenants carry a named, test-pinned signature gimmick — the round announcer shows it before the gates open and the hub roster lists it on every card. Sharing attacks is fine; nobody shares an identity',
       'NINE NEW MECHANICS WERE BUILT FOR IT: homing seek drift (MOSSBACK, VESPER, PALE LEVIATHAN), proximity mines (CINDERMITE, THE LEDGER, LANTERN MAW), orbiting halos that burst outward (PALE HERALD, THE MINTER, MAELSTROM), flood walls with one gap (GLOAMWARDEN, THE LOOM, THE LAST SHORE), mortar shells (CARRION LAW, DREDGEWARDEN), a vortex pull (THE BALLAST, THE UNDERTOW), pinned marks that bill your square (THE AUDITOR, PRESSURE SAINT, THE ABYSSAL ARCHIVE), a teleport step with an arrival clap (THE PUPPETEER, NULL SOVEREIGN), wall-ricochet slugs (THE GORGET), and bile pools that bloom wider while they live (BILESPITTER, CINDERMAW)',
@@ -144,7 +149,7 @@
       row.innerHTML = `
         <div class="rl-rank rk-${r.name.toLowerCase()}">${PIT.rankLabel(r)}</div>
         <div class="rl-sr">${r.min}${r.max === Infinity ? '+' : '-' + r.max}</div>
-        <div class="rl-mods">HP ×${PIT.fmtMul(mods.hpMult)} · GAP ×${PIT.fmtMul(mods.gapMult)}</div>`;
+        <div class="rl-mods">HP ×${PIT.fmtMul(mods.hpMult)} · TEMPO ×${PIT.fmtMul(1 / mods.gapMult)}</div>`;
       ladder.appendChild(row);
     });
 
@@ -251,7 +256,7 @@
     SAVE.runs++; persist();
     show('fight');
     const mutTag = st.mutators.length ? ' — ' + st.mutators.map(m => m.name).join(' · ') : '';
-    $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${PIT.fmtMul(st.mods.hpMult)} GAP ×${PIT.fmtMul(st.mods.gapMult)}${mutTag}`;
+    $('#fight-title').textContent = `${PIT.rankLabel(rk)} // ${st.bossDef.name} — HP ×${PIT.fmtMul(st.mods.hpMult)} TEMPO ×${PIT.fmtMul(1 / st.mods.gapMult)}${mutTag}`;
     showReady(rk);
     running = true; last = performance.now();
     requestAnimationFrame(loop);
